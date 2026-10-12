@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy-950: #080d18;
+  --color-navy-900: #0d1424;
+  --color-navy-800: #131c30;
+  --color-navy-700: #1c2842;
+  --color-navy-600: #2a3a5c;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-navy-950 text-slate-200 antialiased;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}

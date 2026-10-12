@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraphGuard live console</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0b1220; color: #e5e7eb; margin: 0 auto; padding: 20px; max-width: 1000px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .muted { color: #94a3b8; font-size: 13px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  button { background: #111c33; color: #e5e7eb; border: 1px solid #2a3a5c; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+  button:hover { background: #18284a; }
+  .pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid #2a3a5c; }
+  .ok { color: #34d399; } .warn { color: #fbbf24; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #111c33; border: 1px solid #1f2d4d; border-radius: 12px; padding: 12px; }
+  .card h2 { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 8px; }
+  ul { list-style: none; margin: 0; padding: 0; font: 12px ui-monospace, monospace; }
+  li { padding: 4px 0; border-bottom: 1px solid #1a2744; }
+  .stat { display: inline-block; margin-right: 22px; } .stat b { font-size: 22px; display: block; }
+</style>
+</head>
+<body>
+  <h1>GraphGuard live console</h1>
+  <div class="muted">Debug view of the live event stream. The full dashboard comes in Milestone 6.</div>
+
+  <div class="row">
+    <button id="start">Start</button><button id="pause">Pause</button>
+    <button id="resume">Resume</button><button id="reset">Reset simulated data</button>
+    <span class="pill" id="conn">connecting...</span>
+    <span class="pill" id="sim">simulation: ?</span>
+  </div>
+  <div class="muted" id="msg"></div>
+
+  <div class="row card">
+    <span class="stat"><b id="n-acc">0</b>accounts</span>
+    <span class="stat"><b id="n-tx">0</b>transfers (graph edges)</span>
+    <span class="stat"><b id="n-alerts">0</b>alerts</span>
+    <span class="stat"><b id="n-open">0</b>open alerts</span>
+    <span class="stat"><b id="n-dup">0</b>duplicates ignored</span>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h2>Live transactions</h2><ul id="txs"></ul></div>
+    <div class="card"><h2>Alerts</h2><ul id="alerts"></ul></div>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+let lastSeq = null, retry = 0;
+const seenTx = new Set(), seenAlerts = new Set();
+
+function row(text, cls) { const li = document.createElement('li'); li.textContent = text; if (cls) li.className = cls; return li; }
+function addTop(list, li, max = 18) { list.prepend(li); while (list.children.length > max) list.lastChild.remove(); }
+async function api(path, method = 'GET') {
+  const r = await fetch(path, { method });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.status);
+  return j;
+}
+function txRow(t) { return row(`${t.timestamp.slice(11, 19)}  ${t.source_account_id} -> ${t.target_account_id}  ${t.amount} ${t.currency}`); }
+function alertRow(action, a) {
+  return row(`[${action}] #${a.id} ${a.rule} | score ${a.risk_score} (${a.priority}) | ${a.accounts.slice(0, 4).join(' -> ')}`,
+             a.priority === 'high' ? 'warn' : '');
+}
+async function refreshStats() {
+  const s = await api('/api/stats');
+  $('n-acc').textContent = s.accounts; $('n-tx').textContent = s.transactions;
+  $('n-alerts').textContent = s.alerts_total; $('n-open').textContent = s.alerts_open;
+}
+function showSim(s) { $('sim').textContent = 'simulation: ' + s.status; $('n-dup').textContent = s.duplicates_ignored;
+  $('sim').className = 'pill ' + (s.status === 'running' ? 'ok' : s.status === 'error' ? 'warn' : ''); }
+function clearUi() { $('txs').innerHTML = ''; $('alerts').innerHTML = ''; seenTx.clear(); seenAlerts.clear(); }
+async function loadInitial() {
+  clearUi();
+  const [txs, alerts, sim] = await Promise.all([api('/api/transactions?limit=15'), api('/api/alerts?limit=15'), api('/api/simulation')]);
+  txs.reverse().forEach(t => { seenTx.add(t.id); addTop($('txs'), txRow(t)); });
+  alerts.reverse().forEach(a => { seenAlerts.add(a.id); addTop($('alerts'), alertRow('existing', a)); });
+  showSim(sim); refreshStats();
+}
+function onMessage(m) {
+  if (m.type === 'hello') { if (lastSeq === null) lastSeq = m.current_seq; return; }
+  if (m.type === 'resync_required') { lastSeq = m.current_seq; loadInitial(); return; }
+  if (typeof m.seq !== 'number' || (lastSeq !== null && m.seq <= lastSeq)) return;  // old or repeated: ignore
+  lastSeq = m.seq;
+  if (m.type === 'transaction') {
+    if (seenTx.has(m.data.id)) return;
+    seenTx.add(m.data.id); addTop($('txs'), txRow(m.data)); refreshStats();
+  } else if (m.type === 'alert') {
+    seenAlerts.add(m.data.alert.id); addTop($('alerts'), alertRow(m.data.action, m.data.alert)); refreshStats();
+  } else if (m.type === 'simulation') { showSim(m.data); }
+  else if (m.type === 'reset') { clearUi(); refreshStats(); }
+}
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/ws/events' + (lastSeq !== null ? '?last_seq=' + lastSeq : ''));
+  ws.onopen = () => { retry = 0; $('conn').textContent = 'live'; $('conn').className = 'pill ok'; };
+  ws.onmessage = e => onMessage(JSON.parse(e.data));
+  ws.onclose = () => {
+    $('conn').textContent = 'disconnected, retrying...'; $('conn').className = 'pill warn';
+    setTimeout(connect, Math.min(1000 * 2 ** retry++, 8000));
+  };
+}
+for (const name of ['start', 'pause', 'resume', 'reset']) {
+  $(name).onclick = async () => {
+    try { $('msg').textContent = ''; await api('/api/simulation/' + name, 'POST'); }
+    catch (e) { $('msg').textContent = name + ': ' + e.message; }
+  };
+}
+loadInitial().then(connect);
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+# Run everything:  docker compose up --build
+# Dashboard: http://localhost:5173    API: http://localhost:8000
+services:
+  backend:
+    build: ./backend
+    environment:
+      GRAPHGUARD_ENVIRONMENT: production
+      GRAPHGUARD_CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+      GRAPHGUARD_WS_ALLOWED_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+      # Optional AI assistant. Leave empty to use the rule-based assistant (no key needed).
+      GRAPHGUARD_LLM_PROVIDER: ${GRAPHGUARD_LLM_PROVIDER:-none}
+      GRAPHGUARD_LLM_MODEL: ${GRAPHGUARD_LLM_MODEL:-}
+      GRAPHGUARD_LLM_API_KEY: ${GRAPHGUARD_LLM_API_KEY:-}
+      GRAPHGUARD_LLM_BASE_URL: ${GRAPHGUARD_LLM_BASE_URL:-}
+    ports:
+      - "127.0.0.1:8000:8000"   # reachable from this computer only
+    volumes:
+      - graphguard-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=2).status == 200 else 1)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "127.0.0.1:5173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  graphguard-data:
