@@ -17,6 +17,10 @@ class DetectionConfig(BaseModel):
     cycle_window_minutes: int = Field(120, ge=1)
     min_cycle_length: int = Field(3, ge=2)
     max_cycle_length: int = Field(5, ge=2)
+    # A real round trip brings back roughly the same money. A loop whose smallest transfer is
+    # less than this fraction of its largest is treated as coincidence, not a cycle.
+    # 0.8 matches pass_through_ratio: "at least 80% of the value comes back / is passed on".
+    cycle_min_amount_ratio: Decimal = Field(Decimal("0.8"), gt=0, le=1)
     # Rules 3 and 4: bursts and many-counterparty accounts
     burst_window_minutes: int = Field(10, ge=1)
     burst_min_transactions: int = Field(6, ge=2)

@@ -13,6 +13,7 @@ const FIELDS: { key: keyof DetectionConfig; label: string; step: number; help: s
   { key: 'cycle_window_minutes', label: 'Cycle window (min)', step: 5, help: 'Money must return within this time' },
   { key: 'min_cycle_length', label: 'Min cycle length', step: 1, help: 'Fewest transfers in a loop' },
   { key: 'max_cycle_length', label: 'Max cycle length', step: 1, help: 'Most transfers in a loop' },
+  { key: 'cycle_min_amount_ratio', label: 'Loop amount ratio', step: 0.05, help: 'Smallest/largest transfer in a loop; lower than this is treated as coincidence' },
   { key: 'burst_window_minutes', label: 'Burst window (min)', step: 1, help: 'Time window for bursts and many-counterparty checks' },
   { key: 'burst_min_transactions', label: 'Burst size', step: 1, help: 'Transfers inside the window that count as a burst' },
   { key: 'fan_min_counterparties', label: 'Counterparties', step: 1, help: 'Different accounts inside the window that count as a crowd' },
@@ -94,7 +95,7 @@ function DetectionPanel({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
 
   // Show the server's defaults until the user edits something.
-  const fromServer = defaults.data ? { ...defaults.data, pass_through_ratio: Number(defaults.data.pass_through_ratio) } : null
+  const fromServer = defaults.data ? { ...defaults.data, pass_through_ratio: Number(defaults.data.pass_through_ratio), cycle_min_amount_ratio: Number(defaults.data.cycle_min_amount_ratio) } : null
   const config = edited ?? fromServer
   const setConfig = setEdited
 

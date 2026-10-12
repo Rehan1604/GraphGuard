@@ -32,7 +32,7 @@ def burst(n, last_second):
 
 
 def test_burst_threshold_is_inclusive():
-    assert count(burst(6, 10 * MIN), "burst") == 2  # exactly 6 in exactly 10 minutes: flagged (each end)
+    assert count(burst(6, 10 * MIN), "burst") == 1  # exactly 6 in exactly 10 minutes: flagged, once
     assert count(burst(5, 2 * MIN), "burst") == 0  # one fewer: not flagged
 
 
@@ -82,8 +82,8 @@ def test_chain_minimum_length():
 def loop(n, total_min):
     accounts = ["A", "B", "C", "D", "E", "F"][:n]
     step = total_min * MIN / (n - 1)
-    # alternating amounts so the chain rule stays quiet and only the cycle rule is under test
-    return [mks(f"y{i}", accounts[i], accounts[(i + 1) % n], 1000 if i % 2 == 0 else 500, round(i * step)) for i in range(n)]
+    # similar-but-not-identical amounts: a believable round trip (ratio 0.9, above the 0.8 gate)
+    return [mks(f"y{i}", accounts[i], accounts[(i + 1) % n], 1000 if i % 2 == 0 else 900, round(i * step)) for i in range(n)]
 
 
 def test_cycle_window_is_inclusive_at_120_minutes():
@@ -99,15 +99,15 @@ def test_cycle_length_limits(n, expected):
 # ---- the same route reported many times (found by the evaluation) --------------------------------
 def test_parallel_transfers_do_not_multiply_a_loop():
     txs = [mks("p1", "A", "B", 1000, 0), mks("p2", "A", "B", 1000, 20), mks("p3", "A", "B", 1000, 40),
-           mks("q", "B", "C", 500, 300), mks("r", "C", "A", 1000, 600)]
+           mks("q", "B", "C", 900, 300), mks("r", "C", "A", 1000, 600)]
     findings = [f for f in run_detection(txs).findings if f.rule == "cycle"]
     assert len(findings) == 1
     assert "p1" in findings[0].transaction_ids  # the earliest combination is the one kept
 
 
 def test_the_same_loop_hours_later_is_a_new_finding():
-    first = [mks("a1", "A", "B", 1000, 0), mks("a2", "B", "C", 500, 300), mks("a3", "C", "A", 1000, 600)]
-    later = [mks("b1", "A", "B", 1000, 4 * 3600), mks("b2", "B", "C", 500, 4 * 3600 + 300), mks("b3", "C", "A", 1000, 4 * 3600 + 600)]
+    first = [mks("a1", "A", "B", 1000, 0), mks("a2", "B", "C", 900, 300), mks("a3", "C", "A", 1000, 600)]
+    later = [mks("b1", "A", "B", 1000, 4 * 3600), mks("b2", "B", "C", 900, 4 * 3600 + 300), mks("b3", "C", "A", 1000, 4 * 3600 + 600)]
     assert count(first + later, "cycle") == 2
 
 
@@ -118,7 +118,7 @@ def test_parallel_transfers_do_not_multiply_a_chain():
 
 
 def test_the_chosen_evidence_does_not_change_when_later_parallel_transfers_arrive():
-    base = [mks("p1", "A", "B", 1000, 0), mks("q", "B", "C", 500, 300), mks("r", "C", "A", 1000, 600)]
+    base = [mks("p1", "A", "B", 1000, 0), mks("q", "B", "C", 900, 300), mks("r", "C", "A", 1000, 600)]
     before = next(f for f in run_detection(base).findings if f.rule == "cycle")
     after = next(f for f in run_detection(base + [mks("p2", "A", "B", 1000, 700)]).findings if f.rule == "cycle")
     assert before.transaction_ids == after.transaction_ids
@@ -171,3 +171,38 @@ def test_score_is_the_sum_of_contributions_and_capped_at_100():
 def test_nonsense_thresholds_are_rejected(bad):
     with pytest.raises(ValidationError):
         DetectionConfig(**bad)
+
+# ---- precision work: loops must move similar amounts; one burst is one finding -------------------------------
+def three_loop(middle):
+    return [mks("a", "A", "B", 1000, 0), mks("b", "B", "C", middle, 600), mks("c", "C", "A", 1000, 1200)]
+
+
+def test_cycle_amount_gate_is_inclusive_at_the_ratio():
+    assert count(three_loop(800), "cycle") == 1  # smallest/largest = 0.80 exactly: kept
+    assert count(three_loop(799), "cycle") == 0  # 0.799: unrelated payments that happen to line up
+
+
+def test_cycle_amount_gate_is_configurable():
+    assert count(three_loop(500), "cycle", DetectionConfig(cycle_min_amount_ratio=Decimal("0.5"))) == 1
+    with pytest.raises(ValidationError):
+        DetectionConfig(cycle_min_amount_ratio=Decimal("0"))
+    with pytest.raises(ValidationError):
+        DetectionConfig(cycle_min_amount_ratio=Decimal("1.5"))
+
+
+def test_an_unrelated_payment_on_the_same_route_cannot_hide_a_real_loop():
+    """Found on benchmark seed 17: the gate must run BEFORE one loop is chosen per route, or a
+    mismatched earlier payment is chosen, rejected, and the genuine loop is lost."""
+    txs = [mks("noise", "A", "B", 50, 0), mks("a", "A", "B", 1000, 300), mks("b", "B", "C", 990, 900), mks("c", "C", "A", 985, 1500)]
+    (found,) = [f for f in run_detection(txs).findings if f.rule == "cycle"]
+    assert "noise" not in found.transaction_ids and set(found.transaction_ids) == {"a", "b", "c"}
+
+
+def test_one_burst_between_two_accounts_is_one_finding_naming_both():
+    findings = [f for f in run_detection(burst(8, 5 * MIN)).findings if f.rule == "burst"]
+    assert len(findings) == 1 and set(findings[0].accounts) == {"X", "Y"}
+
+
+def test_two_different_bursts_are_still_two_findings():
+    txs = burst(6, 5 * MIN) + [mks(f"z{i}", "P", "Q", 10, 7200 + i * 30) for i in range(6)]
+    assert count(txs, "burst") == 2

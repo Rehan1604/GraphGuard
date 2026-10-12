@@ -223,11 +223,11 @@ def test_a_pattern_that_is_never_flagged_has_no_delay():
 def test_seed_42_results_are_pinned(report):
     """If a rule changes, these numbers change. Update them ON PURPOSE, after looking at why."""
     g, b = report.graph, report.baseline
-    assert (g.findings, g.precision.numerator, g.recall.numerator, g.recall.denominator) == (82, 59, 40, 40)
-    assert g.f1 == 0.8369
+    assert (g.findings, g.precision.numerator, g.recall.numerator, g.recall.denominator) == (70, 52, 40, 40)
+    assert g.f1 == 0.8525
     assert (g.confusion.true_positive, g.confusion.false_negative, g.confusion.false_positive, g.confusion.true_negative) == (40, 0, 13, 23)
     assert (g.false_positives_from_benign_lookalikes, g.false_positives_from_near_misses,
-            g.false_positives_mixed_overlap, g.false_positives_background_only) == (17, 1, 4, 1)
+            g.false_positives_mixed_overlap, g.false_positives_background_only) == (16, 1, 1, 0)
     assert (g.benign_lookalikes_flagged.numerator, g.near_misses_flagged.numerator) == (12, 1)
     assert (b.findings, b.precision.numerator, b.recall.numerator, b.recall_lenient.numerator) == (168, 39, 20, 40)
     assert {k: v.numerator for k, v in b.per_kind_recall.items()} == {"burst": 10, "cycle": 0, "fan": 10, "pass_through_chain": 0}
@@ -293,7 +293,11 @@ def test_the_simulator_stream_has_one_alert_per_loop(bench):
     ds = dataset_from_simulator(42, 240)
     loops = [f for f in run_detection(ds.transactions).findings if f.rule == "cycle"]
     keys = {tuple(sorted(f.accounts)) for f in loops}
-    assert len(loops) == len(keys) == 6  # was 18 alerts for 6 loops before the parallel-transfer fix
+    # was 18 alerts for 6 "loops" before the parallel-transfer fix, and 6 before the amount gate: five of those
+    # six were coincidences among background traffic (amounts 1-7% of each other). One real planted loop remains.
+    assert len(loops) == len(keys) == 1
+    planted = next(e for e in ds.episodes if e.kind == "cycle")
+    assert set(loops[0].transaction_ids) == planted.transaction_ids
 
 
 # ---- the API -----------------------------------------------------------------------------------------------------

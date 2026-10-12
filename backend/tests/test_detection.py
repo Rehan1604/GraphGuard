@@ -52,7 +52,7 @@ def by_rule(result, rule):
 def test_expected_findings_per_rule():
     result = run_detection(scenario())
     counts = {r: len(by_rule(result, r)) for r in ("pass_through_chain", "cycle", "burst", "fan")}
-    assert counts == {"pass_through_chain": 1, "cycle": 1, "burst": 2, "fan": 1}
+    assert counts == {"pass_through_chain": 1, "cycle": 1, "burst": 1, "fan": 1}
 
 
 def test_chain_finding_and_score_breakdown():
@@ -73,7 +73,8 @@ def test_cycle_finding_and_score_breakdown():
 def test_burst_and_fan_findings():
     result = run_detection(scenario())
     bursts = by_rule(result, "burst")
-    assert {b.accounts[0] for b in bursts} == {"B1", "B2"}  # both ends of the burst
+    assert len(bursts) == 1  # one burst is ONE finding, not one per end of the transfers
+    assert bursts[0].accounts[0] == "B1" and "B2" in bursts[0].accounts  # both parties are still named
     assert all(b.risk_score == 20 and b.priority == "low" for b in bursts)
     (fan,) = by_rule(result, "fan")
     assert fan.accounts[0] == "F1" and len(fan.accounts) == 6

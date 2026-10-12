@@ -137,7 +137,14 @@ def find_cycles(tg: TransactionGraph, cfg: DetectionConfig) -> list[Finding]:
         dfs([start], {origin, start.target_account_id})
 
     findings = []
-    for cycle in _one_per_route(list(found.values()), _loop_key, window):
+    def moves_similar_amounts(cycle: list[Transaction]) -> bool:
+        amounts = [t.amount for t in cycle]
+        return min(amounts) / max(amounts) >= cfg.cycle_min_amount_ratio
+
+    # Filter BEFORE choosing one loop per route: otherwise an unrelated payment on the same route
+    # could be chosen as the representative, fail the check, and hide the genuine loop.
+    candidates = [c for c in found.values() if moves_similar_amounts(c)]
+    for cycle in _one_per_route(candidates, _loop_key, window):
         accounts = [t.source_account_id for t in cycle]
         span = (cycle[-1].timestamp - cycle[0].timestamp).total_seconds()
         amounts = [t.amount for t in cycle]
@@ -192,8 +199,13 @@ def _greedy_windows(account: str, tg: TransactionGraph, window: float, qualifies
 def find_bursts(tg: TransactionGraph, cfg: DetectionConfig) -> list[Finding]:
     window = cfg.burst_window_minutes * 60
     findings = []
+    seen_evidence: set[frozenset[str]] = set()
     for account in tg.accounts:
         for chunk in _greedy_windows(account, tg, window, lambda c: len(c) >= cfg.burst_min_transactions):
+            evidence = frozenset(t.id for t in chunk)
+            if evidence in seen_evidence:
+                continue  # A paying B six times is one burst, not one for A and another for B
+            seen_evidence.add(evidence)
             extra = len(chunk) - cfg.burst_min_transactions
             contributions = [
                 ScoreContribution(

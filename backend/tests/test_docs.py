@@ -47,6 +47,6 @@ def test_resume_numbers_match_the_benchmark():
     report = cached_report("benchmark", 42, 240)
     text = read("docs/RESUME.md") + read("docs/TRADEOFFS.md")
     g = report.graph
-    assert f"{g.precision.numerator}/{g.precision.denominator}" in text.replace("(", "").replace(")", "") or "59/82" in text
-    assert (g.precision.numerator, g.precision.denominator) == (59, 82)
+    assert f"{g.precision.numerator}/{g.precision.denominator}" in text.replace("(", "").replace(")", "") or "52/70" in text
+    assert (g.precision.numerator, g.precision.denominator) == (52, 70)
     assert (g.recall.numerator, g.recall.denominator) == (40, 40)

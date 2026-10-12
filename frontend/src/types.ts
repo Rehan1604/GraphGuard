@@ -122,6 +122,7 @@ export interface DetectionConfig {
   cycle_window_minutes: number
   min_cycle_length: number
   max_cycle_length: number
+  cycle_min_amount_ratio: number
   burst_window_minutes: number
   burst_min_transactions: number
   fan_min_counterparties: number

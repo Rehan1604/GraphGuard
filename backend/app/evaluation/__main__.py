@@ -10,12 +10,14 @@ def main() -> None:
     parser.add_argument("--dataset", choices=["benchmark", "simulator"], default="benchmark")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--events", type=int, default=240, help="stream length for the simulator dataset")
-    parser.add_argument("--seeds", type=int, help="instead of one run, repeat on seeds 1..N and show how much the numbers vary")
+    parser.add_argument("--seeds", type=int, help="instead of one run, repeat on N seeds and show how much the numbers vary")
+    parser.add_argument("--seed-start", type=int, default=1, help="first seed for --seeds (default 1; seeds 101-120 were kept as a held-out check)")
     parser.add_argument("--json", help="also write the full report to this file")
     args = parser.parse_args()
     if args.seeds:
-        summary = summarize_seeds(list(range(1, args.seeds + 1)))
-        print(f"Repeated on {len(summary.seeds)} random datasets (seeds 1..{args.seeds}):")
+        seeds = list(range(args.seed_start, args.seed_start + args.seeds))
+        summary = summarize_seeds(seeds)
+        print(f"Repeated on {len(summary.seeds)} random datasets (seeds {seeds[0]}..{seeds[-1]}):")
         for name, m in summary.metrics.items():
             print(f"  {name:20s} mean {m['mean']:.3f}   min {m['min']:.3f}   max {m['max']:.3f}")
         return
