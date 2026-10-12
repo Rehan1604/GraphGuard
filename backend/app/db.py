@@ -2,6 +2,8 @@ import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 
+from fastapi import Request
+
 from app.config import get_settings
 
 SCHEMA = """
@@ -94,9 +96,11 @@ def init_db(path: Path) -> None:
         conn.close()
 
 
-def get_db() -> Iterator[sqlite3.Connection]:
-    """FastAPI dependency: one connection per request, always closed."""
-    conn = connect(get_settings().database_path)
+def get_db(request: Request) -> Iterator[sqlite3.Connection]:
+    """FastAPI dependency: one connection per request, always closed.
+    Uses the settings the app was built with, so an app made with its own database path really uses it."""
+    settings = getattr(request.app.state, "settings", None) or get_settings()
+    conn = connect(settings.database_path)
     try:
         yield conn
     finally:

@@ -66,7 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc" if docs else None,
         openapi_url="/openapi.json" if docs else None,
     )
-    app.state.settings = settings
+    if explicit is not None:
+        app.state.settings = explicit  # the default app reads get_settings() live instead
 
     # Added first, so it sits inside the CORS layer: CORS headers still reach error responses.
     install_middleware(app, settings)
