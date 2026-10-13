@@ -1,30 +1,30 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { WS_URL, fetchSimulation, fetchTransactions } from './api'
-import type { ServerMessage, SimulationState, Transaction } from './types'
 
-export interface LiveState {
-  connected: boolean
-  simulation: SimulationState | null
-  recent: Transaction[] // newest first
-  lastSeq: number | null // the number of the last event we processed
-  changes: number // goes up whenever the data on screen is probably out of date
-}
 
-export const initialLive: LiveState = { connected: false, simulation: null, recent: [], lastSeq: null, changes: 0 }
+
+
+
+
+
+
+
+
+export const initialLive = { connected: false, simulation: null, recent: [], lastSeq: null, changes: 0 }
 const MAX_RECENT = 100
 
-export type LiveAction =
-  | { type: 'connected' }
-  | { type: 'disconnected' }
-  | { type: 'seed'; recent: Transaction[]; simulation: SimulationState }
-  | { type: 'message'; message: ServerMessage }
+ 
 
-function newestFirst(a: Transaction, b: Transaction): number {
+
+
+
+
+function newestFirst(a, b) {
   return a.timestamp === b.timestamp ? b.id.localeCompare(a.id) : b.timestamp.localeCompare(a.timestamp)
 }
 
 /** Pure function: given the old state and one event, return the new state. Easy to test. */
-export function liveReducer(state: LiveState, action: LiveAction): LiveState {
+export function liveReducer(state, action) {
   switch (action.type) {
     case 'connected':
       return { ...state, connected: true }
@@ -59,9 +59,9 @@ export function liveReducer(state: LiveState, action: LiveAction): LiveState {
 }
 
 /** Keeps one WebSocket open (reconnecting with growing delays) and turns events into state. */
-export function useLiveFeed(): LiveState & { dataVersion: number } {
+export function useLiveFeed() {
   const [state, dispatch] = useReducer(liveReducer, initialLive)
-  const lastSeq = useRef<number | null>(null)
+  const lastSeq = useRef(null)
   const changes = useRef(0)
   const applied = useRef(0)
   const [dataVersion, setDataVersion] = useState(0)
@@ -83,8 +83,8 @@ export function useLiveFeed(): LiveState & { dataVersion: number } {
   }, [])
 
   useEffect(() => {
-    let socket: WebSocket | null = null
-    let timer: ReturnType<typeof setTimeout> | undefined
+    let socket = null
+    let timer
     let attempt = 0
     let closed = false
 
@@ -105,7 +105,7 @@ export function useLiveFeed(): LiveState & { dataVersion: number } {
         dispatch({ type: 'connected' })
       }
       socket.onmessage = (event) => {
-        const message = JSON.parse(event.data as string) as ServerMessage
+        const message = JSON.parse(event.data ) 
         dispatch({ type: 'message', message })
         if (message.type === 'resync_required') void seed()
       }

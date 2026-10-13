@@ -2,7 +2,7 @@
 
 Every number below was measured. Re-run the command in brackets before quoting it, because a number you cannot reproduce in front of an interviewer is a liability.
 
-**Project line:** GraphGuard - synthetic-data transaction monitoring and investigation platform (FastAPI, React, TypeScript, SQLite, NetworkX, scikit-learn, vector-store RAG, WebSockets, Docker)
+**Project line:** GraphGuard - synthetic-data transaction monitoring and investigation platform (FastAPI, React, JavaScript, SQLite, NetworkX, scikit-learn, vector-store RAG, WebSockets, Docker)
 
 **Bullets (pick 3-4):**
 - Built a financial-transaction monitoring platform on synthetic data: 28 REST endpoints plus a sequenced WebSocket stream, with idempotent ingest and money stored as integer cents. [`/openapi.json` in development]

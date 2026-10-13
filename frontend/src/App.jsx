@@ -9,9 +9,9 @@ import Network from './views/Network'
 import Overview from './views/Overview'
 import Settings from './views/Settings'
 
-type View = 'overview' | 'alerts' | 'network' | 'evaluation' | 'assistant' | 'settings'
 
-const NAV: { id: View; label: string }[] = [
+
+const NAV = [
   { id: 'overview', label: 'Overview' },
   { id: 'alerts', label: 'Alerts' },
   { id: 'network', label: 'Network' },
@@ -22,11 +22,11 @@ const NAV: { id: View; label: string }[] = [
 
 export default function App() {
   const live = useLiveFeed()
-  const [view, setView] = useState<View>('overview')
-  const [selectedAlert, setSelectedAlert] = useState<number | null>(null)
+  const [view, setView] = useState('overview')
+  const [selectedAlert, setSelectedAlert] = useState(null)
   const [search, setSearch] = useState('')
   const [manual, setManual] = useState(0)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState(null)
 
   // Screens refetch whenever live events arrive (at most once a second) or the user changes something.
   const version = live.dataVersion + manual

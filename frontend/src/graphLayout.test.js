@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { buildEvidenceGraph, buildNetworkGraph, circlePositions, layoutForRule } from './graphLayout'
-import type { AlertDetail, GraphData, Transaction } from './types'
 
-const tx = (id: string, s: string, t: string, amount: string): Transaction => ({
+
+const tx = (id, s, t, amount) => ({
   id, source_account_id: s, target_account_id: t, amount, currency: 'USD',
   timestamp: '2026-03-01T10:00:00Z', ingested_at: '2026-03-01T10:00:00Z',
 })
 
-const detail = (rule: AlertDetail['rule'], accounts: string[], evidence: Transaction[]): AlertDetail => ({
+const detail = (rule, accounts, evidence) => ({
   id: 1, rule, risk_score: 50, priority: 'medium', summary: '', accounts, status: 'new', window_start: '',
   window_end: '', evidence_count: evidence.length, created_at: '', updated_at: '', contributions: [],
   evidence, notes: [], history: [], allowed_next_statuses: [], comment_required_for: [],
@@ -52,7 +52,7 @@ describe('buildEvidenceGraph', () => {
 })
 
 describe('buildNetworkGraph', () => {
-  const data: GraphData = {
+  const data = {
     nodes: [
       { id: 'A', name: 'A', account_type: 'individual', open_alerts: 2 },
       { id: 'B', name: 'B', account_type: 'business', open_alerts: 0 },

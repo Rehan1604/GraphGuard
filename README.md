@@ -10,7 +10,7 @@ Educational project · **synthetic data only** · flags patterns for human revie
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688)
 ![React](https://img.shields.io/badge/React-19-61dafb)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178c6)
+![JavaScript](https://img.shields.io/badge/JavaScript-f7df1e)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ed)
 
 </div>
@@ -162,7 +162,7 @@ The API runs on Render (Docker, see [`render.yaml`](render.yaml)) and the dashbo
 |---|---|
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLite, NetworkX, asyncio, WebSockets |
 | ML / RAG | scikit-learn (gradient boosting, calibration), numpy, joblib; embeddings via fastembed (optional) with an offline fallback, SQLite vector store |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, React Flow |
+| Frontend | React 19, JavaScript (JSX), Vite, Tailwind CSS 4, React Flow |
 | Quality | pytest, Vitest, Testing Library, oxlint, GitHub Actions |
 | Delivery | Docker, Docker Compose, nginx (unprivileged) |
 

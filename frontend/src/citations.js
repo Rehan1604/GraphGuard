@@ -1,11 +1,11 @@
-export type Segment = { kind: 'text'; value: string } | { kind: 'cite'; ids: string[] }
+ 
 
 const CITATION = /\[((?:[FKC]\d+)(?:\s*,\s*[FKC]\d+)*)\]/g
 
 /** Cut a sentence into plain text and citation markers like [F2] or [F1, K3], so each marker
  *  can be drawn as a badge. Nothing here ever becomes HTML. */
-export function splitCitations(text: string): Segment[] {
-  const out: Segment[] = []
+export function splitCitations(text) {
+  const out = []
   let last = 0
   for (const match of text.matchAll(CITATION)) {
     const start = match.index ?? 0

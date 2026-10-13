@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { formatMoney, formatTime, matchesSearch, timeOnly } from './format'
-import type { AlertSummary } from './types'
 
-const alert: AlertSummary = {
+
+const alert = {
   id: 12, rule: 'pass_through_chain', risk_score: 50, priority: 'medium', summary: 'Money moved A -> B',
   accounts: ['SIM-A03', 'SIM-A22'], status: 'new', window_start: '', window_end: '', evidence_count: 3,
   created_at: '', updated_at: '',

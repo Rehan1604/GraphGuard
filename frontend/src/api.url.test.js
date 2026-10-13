@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-async function load(url?: string) {
+async function load(url) {
   vi.resetModules()
   if (url !== undefined) vi.stubEnv('VITE_API_URL', url)
   return import('./api')
@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllEnvs())
 
 describe('API address', () => {
   it('uses the local backend by default', async () => {
-    vi.stubEnv('VITE_API_URL', undefined as unknown as string)
+    vi.stubEnv('VITE_API_URL', undefined )
     const m = await import('./api')
     expect(m.API_URL.startsWith('http')).toBe(true)
   })

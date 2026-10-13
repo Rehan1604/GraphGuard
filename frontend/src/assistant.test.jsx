@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Assistant from './views/Assistant'
-import type { AssistantAnswer } from './types'
+
 
 afterEach(() => {
   cleanup()
@@ -10,7 +10,7 @@ afterEach(() => {
 
 const alertList = [{ id: 3, rule: 'cycle', risk_score: 60, priority: 'medium', summary: '', accounts: ['A', 'B', 'C'], status: 'new', window_start: '', window_end: '', evidence_count: 3, created_at: '', updated_at: '' }]
 
-const answer = (mode: 'ai' | 'rule_based', extra: Partial<AssistantAnswer['explanation']> = {}): AssistantAnswer => ({
+const answer = (mode, extra = {}) => ({
   alert_id: 3, question: 'Why?', disclaimer: 'This is a pattern flagged for human review, not proof of wrongdoing.',
   facts: [{ id: 'F1', text: 'Rule: Circular flow. Risk score 60/100.', kind: 'summary' }],
   guidance: [
@@ -25,11 +25,11 @@ const answer = (mode: 'ai' | 'rule_based', extra: Partial<AssistantAnswer['expla
   },
 })
 
-function mockApi(configured: boolean, reply: () => Response) {
-  const calls: { url: string; body?: string }[] = []
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+function mockApi(configured, reply) {
+  const calls = []
+  vi.stubGlobal('fetch', vi.fn(async (url, init) => {
     const path = url.replace('http://localhost:8000', '')
-    calls.push({ url: path, body: init?.body as string | undefined })
+    calls.push({ url: path, body: init?.body  })
     if (path.startsWith('/api/assistant/status')) {
       return new Response(JSON.stringify({ ai_configured: configured, provider: configured ? 'test' : 'none', model: configured ? 'm' : null, problem: null, privacy: 'Account ids are replaced by aliases.' }))
     }
@@ -59,7 +59,7 @@ describe('Assistant view', () => {
     const { container } = render(<Assistant version={0} selectedAlert={3} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Why was this flagged?' }))
     await waitFor(() => expect(screen.getAllByLabelText('Source F1').length).toBeGreaterThan(0))
-    const badge = screen.getAllByLabelText('Source F1')[0] as HTMLAnchorElement
+    const badge = screen.getAllByLabelText('Source F1')[0] 
     expect(badge.getAttribute('href')).toBe('#src-F1')
     expect(badge.getAttribute('title')).toContain('Rule: Circular flow')
     expect(screen.getByText(/Bad <img src=x onerror=alert\(1\)> text/)).toBeTruthy()
@@ -69,7 +69,7 @@ describe('Assistant view', () => {
   it('labels AI output as AI, shows warnings, and offers the AI switch only when a provider exists', async () => {
     mockApi(true, () => new Response(JSON.stringify(answer('ai', { warnings: ['The AI cited sources that do not exist (F9).'] }))))
     render(<Assistant version={0} selectedAlert={3} />)
-    const toggle = (await screen.findByLabelText('Use the AI provider')) as HTMLInputElement
+    const toggle = (await screen.findByLabelText('Use the AI provider')) 
     await waitFor(() => expect(toggle.disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: 'What should I check next?' }))
     await waitFor(() => expect(screen.getByText('AI-generated')).toBeTruthy())
@@ -79,7 +79,7 @@ describe('Assistant view', () => {
   it('without a provider the AI switch is disabled and the status says answers are not AI', async () => {
     mockApi(false, () => new Response(JSON.stringify(answer('rule_based'))))
     render(<Assistant version={0} selectedAlert={3} />)
-    const toggle = (await screen.findByLabelText('Use the AI provider')) as HTMLInputElement
+    const toggle = (await screen.findByLabelText('Use the AI provider')) 
     expect(toggle.disabled).toBe(true)
     await waitFor(() => expect(screen.getByText(/rule-based summaries, not AI/)).toBeTruthy())
   })
@@ -87,12 +87,12 @@ describe('Assistant view', () => {
   it('sends use_ai=false when the analyst switches AI off, and shows server errors', async () => {
     const calls = mockApi(true, () => new Response(JSON.stringify({ detail: 'Alert 3 not found' }), { status: 404 }))
     render(<Assistant version={0} selectedAlert={3} />)
-    const toggle = (await screen.findByLabelText('Use the AI provider')) as HTMLInputElement
+    const toggle = (await screen.findByLabelText('Use the AI provider')) 
     await waitFor(() => expect(toggle.disabled).toBe(false))
     fireEvent.click(toggle)
     fireEvent.click(screen.getByRole('button', { name: 'Why was this flagged?' }))
     await waitFor(() => expect(screen.getByText('Alert 3 not found')).toBeTruthy())
-    const post = calls.find((c) => c.url === '/api/alerts/3/assistant')!
-    expect(JSON.parse(post.body!)).toEqual({ question: 'Why was this flagged?', use_ai: false })
+    const post = calls.find((c) => c.url === '/api/alerts/3/assistant')
+    expect(JSON.parse(post.body)).toEqual({ question: 'Why was this flagged?', use_ai: false })
   })
 })

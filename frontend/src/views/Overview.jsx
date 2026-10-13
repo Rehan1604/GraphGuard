@@ -2,13 +2,13 @@ import { fetchAlerts, fetchMetrics, fetchSimulation, fetchStats } from '../api'
 import { Async, Bar, Card, Empty, PriorityBadge, Stat, StatusBadge } from '../components/ui'
 import { RULE_LABELS, formatMoney, timeOnly } from '../format'
 import { useFetch } from '../hooks'
-import type { LiveState } from '../live'
 
-export default function Overview({ version, live, onOpenAlert }: {
-  version: number
-  live: LiveState
-  onOpenAlert: (id: number) => void
-}) {
+
+export default function Overview({ version, live, onOpenAlert }
+
+
+
+) {
   const stats = useFetch(fetchStats, [version])
   const metrics = useFetch(fetchMetrics, [version])
   const alerts = useFetch(() => fetchAlerts({}), [version])

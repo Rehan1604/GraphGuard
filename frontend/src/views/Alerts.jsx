@@ -4,20 +4,20 @@ import AlertDetail from '../components/AlertDetail'
 import { Async, Empty, PriorityBadge, StatusBadge, inputClass } from '../components/ui'
 import { RULE_LABELS, STATUS_LABELS, formatTime, matchesSearch } from '../format'
 import { useFetch } from '../hooks'
-import type { Priority, Rule, Status } from '../types'
 
-export default function Alerts({ version, selectedId, onSelect, search, onSearch, onChanged,onAsk }: {
-  version: number
-  selectedId: number | null
-  onSelect: (id: number) => void
-  search: string
-  onSearch: (text: string) => void
-  onChanged: () => void
-  onAsk: (id: number) => void
-}) {
-  const [status, setStatus] = useState<Status | ''>('')
-  const [priority, setPriority] = useState<Priority | ''>('')
-  const [rule, setRule] = useState<Rule | ''>('')
+
+export default function Alerts({ version, selectedId, onSelect, search, onSearch, onChanged,onAsk }
+
+
+
+
+
+
+
+) {
+  const [status, setStatus] = useState('')
+  const [priority, setPriority] = useState('')
+  const [rule, setRule] = useState('')
   const state = useFetch(() => fetchAlerts({ status, priority, rule }), [status, priority, rule, version])
 
   const visible = (state.data ?? []).filter((a) => matchesSearch(a, search))
@@ -42,14 +42,14 @@ export default function Alerts({ version, selectedId, onSelect, search, onSearch
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label htmlFor="f-status" className="mb-1 block text-xs text-slate-400">Status</label>
-              <select id="f-status" className={inputClass} value={status} onChange={(e) => setStatus(e.target.value as Status | '')}>
+              <select id="f-status" className={inputClass} value={status} onChange={(e) => setStatus(e.target.value )}>
                 <option value="">All</option>
-                {(Object.keys(STATUS_LABELS) as Status[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                {(Object.keys(STATUS_LABELS) ).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="f-priority" className="mb-1 block text-xs text-slate-400">Priority</label>
-              <select id="f-priority" className={inputClass} value={priority} onChange={(e) => setPriority(e.target.value as Priority | '')}>
+              <select id="f-priority" className={inputClass} value={priority} onChange={(e) => setPriority(e.target.value )}>
                 <option value="">All</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
@@ -58,9 +58,9 @@ export default function Alerts({ version, selectedId, onSelect, search, onSearch
             </div>
             <div>
               <label htmlFor="f-rule" className="mb-1 block text-xs text-slate-400">Pattern</label>
-              <select id="f-rule" className={inputClass} value={rule} onChange={(e) => setRule(e.target.value as Rule | '')}>
+              <select id="f-rule" className={inputClass} value={rule} onChange={(e) => setRule(e.target.value )}>
                 <option value="">All</option>
-                {(Object.keys(RULE_LABELS) as Rule[]).map((r) => <option key={r} value={r}>{RULE_LABELS[r]}</option>)}
+                {(Object.keys(RULE_LABELS) ).map((r) => <option key={r} value={r}>{RULE_LABELS[r]}</option>)}
               </select>
             </div>
           </div>

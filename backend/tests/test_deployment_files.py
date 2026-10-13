@@ -31,7 +31,7 @@ def text_files():
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for name in files:
             path = Path(folder) / name
-            if path.suffix in {".py", ".md", ".yml", ".yaml", ".json", ".ts", ".tsx", ".conf", ".txt", ".example", ".html", ""} \
+            if path.suffix in {".py", ".md", ".yml", ".yaml", ".json", ".ts", ".tsx", ".js", ".jsx", ".conf", ".txt", ".example", ".html", ""} \
                     and path.stat().st_size < 600_000 and path.name != "package-lock.json":
                 yield path
 

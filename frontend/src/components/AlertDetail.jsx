@@ -3,11 +3,11 @@ import { addNote, changeStatus, fetchAlert } from '../api'
 import { RULE_LABELS, STATUS_LABELS, formatMoney, formatTime } from '../format'
 import { buildEvidenceGraph } from '../graphLayout'
 import { useFetch } from '../hooks'
-import type { AlertDetail as Detail, HistoryEvent, Status } from '../types'
+
 import FlowGraph from './FlowGraph'
 import { Async, Card, PriorityBadge, StatusBadge, buttonClass, inputClass, primaryButtonClass } from './ui'
 
-function describeEvent(e: HistoryEvent): string {
+function describeEvent(e) {
   if (e.event === 'created') return 'Alert raised by the detection rules'
   if (e.event === 'evidence_grew') return 'New evidence added'
   if (e.event === 'status_changed' && e.from_status && e.to_status) {
@@ -16,12 +16,12 @@ function describeEvent(e: HistoryEvent): string {
   return e.event
 }
 
-export default function AlertDetail({ alertId, refreshKey, onChanged, onAsk }: {
-  alertId: number
-  refreshKey: number
-  onChanged: () => void
-  onAsk?: (id: number) => void
-}) {
+export default function AlertDetail({ alertId, refreshKey, onChanged, onAsk }
+
+
+
+
+) {
   const state = useFetch(() => fetchAlert(alertId), [alertId, refreshKey])
   const [analyst, setAnalyst] = useState('analyst')
 
@@ -43,13 +43,13 @@ export default function AlertDetail({ alertId, refreshKey, onChanged, onAsk }: {
   )
 }
 
-function Body({ detail, analyst, setAnalyst,onAsk ,onSaved}: {
-  detail: Detail
-  analyst: string
-  setAnalyst: (name: string) => void 
-  onAsk?: (id: number) => void
-  onSaved: () => void
-}) {
+function Body({ detail, analyst, setAnalyst,onAsk ,onSaved}
+
+
+
+
+
+) {
   const graph = useMemo(() => buildEvidenceGraph(detail), [detail])
   const total = detail.contributions.reduce((sum, c) => sum + c.points, 0)
 
@@ -147,12 +147,12 @@ function Body({ detail, analyst, setAnalyst,onAsk ,onSaved}: {
   )
 }
 
-function StatusPanel({ detail, analyst, onSaved }: { detail: Detail; analyst: string; onSaved: () => void }) {
+function StatusPanel({ detail, analyst, onSaved }) {
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
-  async function move(status: Status) {
+  async function move(status) {
     setBusy(true)
     setError(null)
     try {
@@ -199,10 +199,10 @@ function StatusPanel({ detail, analyst, onSaved }: { detail: Detail; analyst: st
   )
 }
 
-function NotesPanel({ detail, analyst, onSaved }: { detail: Detail; analyst: string; onSaved: () => void }) {
+function NotesPanel({ detail, analyst, onSaved }) {
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   async function save() {
     setBusy(true)
@@ -240,7 +240,7 @@ function NotesPanel({ detail, analyst, onSaved }: { detail: Detail; analyst: str
   )
 }
 
-function TriageCard({ detail }: { detail: Detail }) {
+function TriageCard({ detail }) {
   if (detail.ml_score === null || detail.ml_score === undefined) {
     return (
       <Card title="ML triage">

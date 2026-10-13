@@ -2,16 +2,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { comparisonRows, formatRate } from './format'
 import Evaluation from './views/Evaluation'
-import type { DetectorResult, EvaluationReport, Rate } from './types'
+
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
 })
 
-const rate = (n: number, d: number): Rate => ({ numerator: n, denominator: d, value: d ? n / d : null })
+const rate = (n, d) => ({ numerator: n, denominator: d, value: d ? n / d : null })
 
-const detector = (over: Partial<DetectorResult> = {}): DetectorResult => ({
+const detector = (over = {}) => ({
   name: 'x', findings: 82, precision: rate(59, 82), recall: rate(40, 40), recall_lenient: rate(40, 40), f1: 0.8369,
   per_kind_recall: { cycle: rate(10, 10), burst: rate(10, 10) },
   confusion: { true_positive: 40, false_negative: 0, false_positive: 13, true_negative: 23 },
@@ -20,7 +20,7 @@ const detector = (over: Partial<DetectorResult> = {}): DetectorResult => ({
   near_misses_flagged: rate(1, 24), background_only_findings_per_1000_background: 1.43, ...over,
 })
 
-const report: EvaluationReport = {
+const report = {
   dataset: { name: 'benchmark', seed: 42, transactions: 1053, background_transactions: 700, episodes_by_role: { positive: 40, near_miss: 24 }, positives_by_kind: { cycle: 10 } },
   graph: detector(),
   baseline: detector({ findings: 168, precision: rate(39, 168), recall: rate(20, 40), f1: 0.317, per_kind_recall: { cycle: rate(0, 10), burst: rate(10, 10) } }),
@@ -31,9 +31,9 @@ const report: EvaluationReport = {
   caveats: ['This is a SYNTHETIC benchmark. Precision depends on the mix of look-alikes I planted.'],
 }
 
-function mockApi(evaluation: () => Response) {
-  const calls: string[] = []
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+function mockApi(evaluation) {
+  const calls = []
+  vi.stubGlobal('fetch', vi.fn(async (url) => {
     const path = url.replace('http://localhost:8000', '')
     calls.push(path)
     if (path.startsWith('/api/evaluation')) return evaluation()

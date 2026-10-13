@@ -1,6 +1,6 @@
 # GraphGuard dashboard
 
-React + TypeScript + Vite + Tailwind. See the [project README](../README.md) for how to run everything.
+React + JavaScript (JSX) + Vite + Tailwind. See the [project README](../README.md) for how to run everything.
 
 ```powershell
 npm ci

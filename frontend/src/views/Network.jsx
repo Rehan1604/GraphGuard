@@ -5,11 +5,11 @@ import { Async, Card, Empty, buttonClass, inputClass } from '../components/ui'
 import { formatMoney } from '../format'
 import { buildNetworkGraph } from '../graphLayout'
 import { useFetch } from '../hooks'
-import type { GraphData } from '../types'
 
-export default function Network({ version, onSearchAccount }: { version: number; onSearchAccount: (id: string) => void }) {
+
+export default function Network({ version, onSearchAccount }) {
   const [limit, setLimit] = useState(300)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState(null)
   const state = useFetch(() => fetchGraph(limit), [limit, version])
 
   return (
@@ -42,12 +42,12 @@ export default function Network({ version, onSearchAccount }: { version: number;
   )
 }
 
-function NetworkBody({ data, selected, onSelect, onSearchAccount }: {
-  data: GraphData
-  selected: string | null
-  onSelect: (id: string) => void
-  onSearchAccount: (id: string) => void
-}) {
+function NetworkBody({ data, selected, onSelect, onSearchAccount }
+
+
+
+
+) {
   const graph = useMemo(() => buildNetworkGraph(data, selected), [data, selected])
   const node = data.nodes.find((n) => n.id === selected)
   const outgoing = data.edges.filter((e) => e.source === selected)

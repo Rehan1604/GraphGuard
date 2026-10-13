@@ -3,11 +3,11 @@ import { fetchEvaluation, fetchMetrics } from '../api'
 import { Async, Bar, Card, Empty, ErrorBox, Spinner, buttonClass, inputClass, primaryButtonClass } from '../components/ui'
 import { RULE_LABELS, STATUS_LABELS, comparisonRows, formatRate } from '../format'
 import { useFetch } from '../hooks'
-import type { DelayStats, EvaluationReport, Rule, Status, Sweep } from '../types'
 
-const KIND_LABELS: Record<string, string> = { ...RULE_LABELS }
 
-export default function Evaluation({ version }: { version: number }) {
+const KIND_LABELS = { ...RULE_LABELS }
+
+export default function Evaluation({ version }) {
   const state = useFetch(fetchMetrics, [version])
 
   return (
@@ -22,14 +22,14 @@ export default function Evaluation({ version }: { version: number }) {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card title={`Your alerts by pattern (${m.total} total)`}>
                 <div className="space-y-2">
-                  {(Object.keys(RULE_LABELS) as Rule[]).map((r) => (
+                  {(Object.keys(RULE_LABELS) ).map((r) => (
                     <Bar key={r} label={RULE_LABELS[r]} value={m.by_rule[r]} max={ruleMax} />
                   ))}
                 </div>
               </Card>
               <Card title="Your alerts by review status">
                 <div className="space-y-2">
-                  {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
+                  {(Object.keys(STATUS_LABELS) ).map((s) => (
                     <Bar key={s} label={STATUS_LABELS[s]} value={m.by_status[s]} max={statusMax} />
                   ))}
                 </div>
@@ -47,12 +47,12 @@ export default function Evaluation({ version }: { version: number }) {
 }
 
 function Benchmark() {
-  const [dataset, setDataset] = useState<'benchmark' | 'simulator'>('benchmark')
+  const [dataset, setDataset] = useState('benchmark')
   const [seed, setSeed] = useState(42)
   const [events, setEvents] = useState(240)
-  const [report, setReport] = useState<EvaluationReport | null>(null)
+  const [report, setReport] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   async function run() {
     setBusy(true)
@@ -75,7 +75,7 @@ function Benchmark() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label htmlFor="bm-dataset" className="mb-1 block text-xs text-slate-400">Dataset</label>
-          <select id="bm-dataset" className={`${inputClass} w-64`} value={dataset} onChange={(e) => setDataset(e.target.value as 'benchmark' | 'simulator')}>
+          <select id="bm-dataset" className={`${inputClass} w-64`} value={dataset} onChange={(e) => setDataset(e.target.value )}>
             <option value="benchmark">Designed benchmark (with near-misses and look-alikes)</option>
             <option value="simulator">Live simulator stream (planted patterns only)</option>
           </select>
@@ -107,7 +107,7 @@ function Benchmark() {
   )
 }
 
-function Results({ report: r }: { report: EvaluationReport }) {
+function Results({ report: r }) {
   const d = r.dataset
   const rows = comparisonRows(r.graph, r.baseline)
   const c = r.graph.confusion
@@ -204,7 +204,7 @@ function Results({ report: r }: { report: EvaluationReport }) {
   )
 }
 
-function DelayBlock({ delay: d }: { delay: DelayStats }) {
+function DelayBlock({ delay: d }) {
   if (d.detected === 0) return <p className="text-sm text-slate-400">No planted pattern was flagged while streaming, so there is no delay to report.</p>
   return (
     <div>
@@ -223,8 +223,8 @@ function DelayBlock({ delay: d }: { delay: DelayStats }) {
   )
 }
 
-function SweepTable({ sweep }: { sweep: Sweep }) {
-  const pct = (x: number | null) => (x === null ? 'n/a' : `${(x * 100).toFixed(1)}%`)
+function SweepTable({ sweep }) {
+  const pct = (x) => (x === null ? 'n/a' : `${(x * 100).toFixed(1)}%`)
   return (
     <div>
       <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Threshold sweep: {sweep.parameter}</h3>
@@ -251,7 +251,7 @@ function SweepTable({ sweep }: { sweep: Sweep }) {
   )
 }
 
-function TriageBlock({ triage, graph }: { triage: NonNullable<EvaluationReport['triage']>; graph: EvaluationReport['graph'] }) {
+function TriageBlock({ triage, graph }) {
   const t = triage.result
   return (
     <section className="rounded-lg border border-navy-600 bg-navy-800 p-3">

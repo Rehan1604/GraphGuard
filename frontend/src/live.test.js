@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { initialLive, liveReducer, type LiveState } from './live'
-import type { ServerMessage, SimulationState, Transaction } from './types'
+import { initialLive, liveReducer, } from './live'
 
-const tx = (id: string, ts = '2026-03-01T10:00:00Z'): Transaction => ({
+
+const tx = (id, ts = '2026-03-01T10:00:00Z') => ({
   id, source_account_id: 'A', target_account_id: 'B', amount: '1.00', currency: 'USD', timestamp: ts, ingested_at: ts,
 })
-const sim: SimulationState = {
+const sim = {
   status: 'running', events_emitted: 1, transactions_created: 1, duplicates_ignored: 0, errors: 0,
   events_per_second: 2, seed: 1, duplicate_rate: 0, sim_time: null,
 }
-const msg = (state: LiveState, message: ServerMessage) => liveReducer(state, { type: 'message', message })
-const txMsg = (seq: number, id: string): ServerMessage => ({ seq, type: 'transaction', data: tx(id) })
+const msg = (state, message) => liveReducer(state, { type: 'message', message })
+const txMsg = (seq, id) => ({ seq, type: 'transaction', data: tx(id) })
 
 describe('liveReducer', () => {
   it('remembers the first hello number so older events are not replayed to the screen', () => {

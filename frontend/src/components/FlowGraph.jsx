@@ -1,13 +1,13 @@
-import { Background, Controls, ReactFlow, type Edge, type Node } from '@xyflow/react'
+import { Background, Controls, ReactFlow, } from '@xyflow/react'
 
 /** A thin wrapper around React Flow. Give the parent a `key` to re-fit the view when the data changes. */
-export default function FlowGraph({ nodes, edges, height = 340, label, onNodeClick }: {
-  nodes: Node[]
-  edges: Edge[]
-  height?: number
-  label: string
-  onNodeClick?: (id: string) => void
-}) {
+export default function FlowGraph({ nodes, edges, height = 340, label, onNodeClick }
+
+
+
+
+
+) {
   return (
     <div
       role="group"

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import AlertDetail from './components/AlertDetail'
 import { initialLive } from './live'
 import Overview from './views/Overview'
-import type { AlertDetail as Detail } from './types'
+
 
 // React Flow needs real browser layout APIs that the test environment lacks, so swap in a stub.
 vi.mock('./components/FlowGraph', () => ({ default: () => <div data-testid="graph" /> }))
@@ -13,11 +13,11 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function mockApi(routes: Record<string, unknown>, failing: string[] = []) {
-  const calls: { url: string; method: string; body?: string }[] = []
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+function mockApi(routes, failing = []) {
+  const calls = []
+  vi.stubGlobal('fetch', vi.fn(async (url, init) => {
     const path = url.replace('http://localhost:8000', '')
-    calls.push({ url: path, method: init?.method ?? 'GET', body: init?.body as string | undefined })
+    calls.push({ url: path, method: init?.method ?? 'GET', body: init?.body  })
     if (failing.some((f) => path.startsWith(f))) return new Response(JSON.stringify({ detail: 'Cannot do that' }), { status: 409 })
     const key = Object.keys(routes).find((k) => path.startsWith(k))
     return new Response(JSON.stringify(key ? routes[key] : {}), { status: 200 })
@@ -51,7 +51,7 @@ describe('Overview', () => {
   })
 })
 
-const detail = (overrides: Partial<Detail> = {}): Detail => ({
+const detail = (overrides = {}) => ({
   id: 3, rule: 'cycle', risk_score: 60, priority: 'medium', summary: 'Money looped A -> B -> C -> A', accounts: ['A', 'B', 'C'],
   status: 'in_review', window_start: '2026-03-01T10:00:00Z', window_end: '2026-03-01T10:40:00Z', evidence_count: 1,
   created_at: '2026-03-01T10:00:00Z', updated_at: '2026-03-01T10:00:00Z',
@@ -85,14 +85,14 @@ describe('AlertDetail', () => {
   it('keeps dismiss disabled until a reason is typed, then sends it with the analyst name', async () => {
     const calls = mockApi({ '/api/alerts/3': detail() })
     render(<AlertDetail alertId={3} refreshKey={0} onChanged={() => {}} />)
-    const dismiss = await screen.findByRole('button', { name: 'Mark dismissed' }) as HTMLButtonElement
+    const dismiss = await screen.findByRole('button', { name: 'Mark dismissed' }) 
     expect(dismiss.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: 'Payroll account' } })
     expect(dismiss.disabled).toBe(false)
     fireEvent.click(dismiss)
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.url === '/api/alerts/3/status')).toBe(true))
-    const post = calls.find((c) => c.url === '/api/alerts/3/status')!
-    expect(JSON.parse(post.body!)).toEqual({ status: 'dismissed', comment: 'Payroll account', actor: 'analyst' })
+    const post = calls.find((c) => c.url === '/api/alerts/3/status')
+    expect(JSON.parse(post.body)).toEqual({ status: 'dismissed', comment: 'Payroll account', actor: 'analyst' })
   })
 
   it('shows the server message if a status change is rejected', async () => {
@@ -106,7 +106,7 @@ describe('AlertDetail', () => {
   it('lets an analyst save a note', async () => {
     const calls = mockApi({ '/api/alerts/3': detail() })
     render(<AlertDetail alertId={3} refreshKey={0} onChanged={() => {}} />)
-    const save = await screen.findByRole('button', { name: 'Save note' }) as HTMLButtonElement
+    const save = await screen.findByRole('button', { name: 'Save note' }) 
     expect(save.disabled).toBe(true)
     fireEvent.change(screen.getByLabelText('Add a note'), { target: { value: 'Called the branch' } })
     fireEvent.click(save)

@@ -3,9 +3,9 @@ import { fetchDetectionConfig, fetchSimulation, previewDetection, scanAlerts, si
 import { Async, Card, ErrorBox, PriorityBadge, buttonClass, inputClass, primaryButtonClass } from '../components/ui'
 import { RULE_LABELS } from '../format'
 import { useFetch } from '../hooks'
-import type { DetectionConfig, DetectionResult, Rule, ScanSummary, StartOptions } from '../types'
 
-const FIELDS: { key: keyof DetectionConfig; label: string; step: number; help: string }[] = [
+
+const FIELDS = [
   { key: 'pass_through_ratio', label: 'Pass-through ratio', step: 0.05, help: 'Smallest share of incoming money that counts as "forwarded"' },
   { key: 'chain_hop_window_minutes', label: 'Chain hop window (min)', step: 1, help: 'Max minutes between money arriving and leaving' },
   { key: 'min_chain_hops', label: 'Min chain hops', step: 1, help: 'Shortest chain worth flagging' },
@@ -19,7 +19,7 @@ const FIELDS: { key: keyof DetectionConfig; label: string; step: number; help: s
   { key: 'fan_min_counterparties', label: 'Counterparties', step: 1, help: 'Different accounts inside the window that count as a crowd' },
 ]
 
-export default function Settings({ version, onChanged }: { version: number; onChanged: () => void }) {
+export default function Settings({ version, onChanged }) {
   return (
     <div className="space-y-4">
       <SimulationPanel version={version} onChanged={onChanged} />
@@ -28,12 +28,12 @@ export default function Settings({ version, onChanged }: { version: number; onCh
   )
 }
 
-function SimulationPanel({ version, onChanged }: { version: number; onChanged: () => void }) {
+function SimulationPanel({ version, onChanged }) {
   const sim = useFetch(fetchSimulation, [version])
-  const [options, setOptions] = useState<StartOptions>({ events_per_second: 2, seed: 42, duplicate_rate: 0.05 })
-  const [error, setError] = useState<string | null>(null)
+  const [options, setOptions] = useState({ events_per_second: 2, seed: 42, duplicate_rate: 0.05 })
+  const [error, setError] = useState(null)
 
-  async function act(action: 'start' | 'pause' | 'resume' | 'reset') {
+  async function act(action) {
     if (action === 'reset' && !window.confirm('Delete all simulated accounts, transactions and alerts? Your own data is not touched.')) return
     setError(null)
     try {
@@ -86,12 +86,12 @@ function SimulationPanel({ version, onChanged }: { version: number; onChanged: (
   )
 }
 
-function DetectionPanel({ onChanged }: { onChanged: () => void }) {
+function DetectionPanel({ onChanged }) {
   const defaults = useFetch(fetchDetectionConfig, [])
-  const [edited, setEdited] = useState<DetectionConfig | null>(null)
-  const [preview, setPreview] = useState<DetectionResult | null>(null)
-  const [saved, setSaved] = useState<ScanSummary | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [edited, setEdited] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [saved, setSaved] = useState(null)
+  const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
   // Show the server's defaults until the user edits something.
@@ -99,7 +99,7 @@ function DetectionPanel({ onChanged }: { onChanged: () => void }) {
   const config = edited ?? fromServer
   const setConfig = setEdited
 
-  async function run(kind: 'preview' | 'scan') {
+  async function run(kind) {
     if (!config) return
     setBusy(true)
     setError(null)
@@ -150,7 +150,7 @@ function DetectionPanel({ onChanged }: { onChanged: () => void }) {
                     Preview over {preview.transactions_analyzed} transactions: <strong>{preview.findings.length}</strong> patterns.
                   </p>
                   <p className="mb-2 text-xs text-slate-400">
-                    {(Object.keys(RULE_LABELS) as Rule[]).map((r) => `${RULE_LABELS[r]}: ${preview.findings.filter((f) => f.rule === r).length}`).join(' | ')}
+                    {(Object.keys(RULE_LABELS) ).map((r) => `${RULE_LABELS[r]}: ${preview.findings.filter((f) => f.rule === r).length}`).join(' | ')}
                   </p>
                   <ul className="space-y-1">
                     {preview.findings.slice(0, 8).map((f, i) => (

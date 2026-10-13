@@ -1,20 +1,20 @@
-import type { AlertSummary, DetectorResult, Rate, Rule, Status } from './types'
 
-export const RULE_LABELS: Record<Rule, string> = {
+
+export const RULE_LABELS = {
   pass_through_chain: 'Pass-through chain',
   cycle: 'Circular flow',
   burst: 'Transfer burst',
   fan: 'Many counterparties',
 }
 
-export const STATUS_LABELS: Record<Status, string> = {
+export const STATUS_LABELS = {
   new: 'New',
   in_review: 'In review',
   escalated: 'Escalated',
   dismissed: 'Dismissed',
 }
 
-export function formatMoney(amount: string, currency = 'USD'): string {
+export function formatMoney(amount, currency = 'USD') {
   const n = Number(amount)
   if (!Number.isFinite(n)) return `${amount} ${currency}`
   try {
@@ -25,39 +25,39 @@ export function formatMoney(amount: string, currency = 'USD'): string {
 }
 
 /** Always shown in UTC so everyone looking at the same alert sees the same time. */
-export function formatTime(iso: string): string {
+export function formatTime(iso) {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return `${d.toISOString().slice(0, 19).replace('T', ' ')} UTC`
 }
 
-export function timeOnly(iso: string): string {
+export function timeOnly(iso) {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(11, 19)
 }
 
-export function matchesSearch(alert: AlertSummary, query: string): boolean {
+export function matchesSearch(alert, query) {
   const q = query.trim().replace(/^#/, '').toLowerCase()
   if (!q) return true
   const haystack = [String(alert.id), alert.rule, RULE_LABELS[alert.rule] ?? '', alert.summary, ...alert.accounts]
   return haystack.some((text) => text.toLowerCase().includes(q))
 }
 /** "59 / 82 (72.0%)", or "n/a" when the fraction is undefined. The denominator is always shown. */
-export function formatRate(r: Rate): string {
+export function formatRate(r) {
   const pct = r.value === null ? 'n/a' : `${(r.value * 100).toFixed(1)}%`
   return `${r.numerator} / ${r.denominator} (${pct})`
 }
 
-export interface ComparisonRow {
-  label: string
-  help: string
-  graph: string
-  baseline: string
-}
 
-export function comparisonRows(g: DetectorResult, b: DetectorResult): ComparisonRow[] {
-  const f1 = (r: DetectorResult) => (r.f1 === null ? 'n/a' : r.f1.toFixed(3))
-  const fp = (r: DetectorResult) =>
+
+
+
+
+
+
+export function comparisonRows(g, b) {
+  const f1 = (r) => (r.f1 === null ? 'n/a' : r.f1.toFixed(3))
+  const fp = (r) =>
     `${r.false_positive_findings} (${r.false_positives_from_benign_lookalikes} look-alikes, ${r.false_positives_from_near_misses} near-misses, ` +
     `${r.false_positives_mixed_overlap} partial overlap, ${r.false_positives_background_only} pure background)`
   return [

@@ -4,23 +4,23 @@ import { Async, Card, ErrorBox, Spinner, buttonClass, inputClass, primaryButtonC
 import { splitCitations } from '../citations'
 import { RULE_LABELS } from '../format'
 import { useFetch } from '../hooks'
-import type { AssistantAnswer } from '../types'
+
 
 const SUGGESTIONS = ['Why was this flagged?', 'What innocent explanations are there?', 'What should I check next?']
 
-export default function Assistant({ version, selectedAlert }: { version: number; selectedAlert: number | null }) {
+export default function Assistant({ version, selectedAlert }) {
   const status = useFetch(fetchAssistantStatus, [])
   const alerts = useFetch(() => fetchAlerts({}), [version])
-  const [alertId, setAlertId] = useState<number | null>(selectedAlert)
+  const [alertId, setAlertId] = useState(selectedAlert)
   const [question, setQuestion] = useState('')
   const [useAi, setUseAi] = useState(true)
-  const [answer, setAnswer] = useState<AssistantAnswer | null>(null)
+  const [answer, setAnswer] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   const chosen = alertId ?? alerts.data?.[0]?.id ?? null
 
-  async function ask(text: string) {
+  async function ask(text) {
     if (chosen === null || text.trim() === '') return
     setBusy(true)
     setError(null)
@@ -98,12 +98,12 @@ export default function Assistant({ version, selectedAlert }: { version: number;
   )
 }
 
-function Answer({ answer }: { answer: AssistantAnswer }) {
+function Answer({ answer }) {
   const { explanation: e } = answer
-  const lookup = new Map<string, string>([
-    ...answer.facts.map((f) => [f.id, f.text] as [string, string]),
-    ...answer.guidance.map((g) => [g.id, `${g.title}: ${g.section}`] as [string, string]),
-    ...(answer.similar_cases ?? []).map((c) => [c.id, `Alert #${c.alert_id} (${c.status})`] as [string, string]),
+  const lookup = new Map([
+    ...answer.facts.map((f) => [f.id, f.text] ),
+    ...answer.guidance.map((g) => [g.id, `${g.title}: ${g.section}`] ),
+    ...(answer.similar_cases ?? []).map((c) => [c.id, `Alert #${c.alert_id} (${c.status})`] ),
   ])
 
   return (
@@ -195,7 +195,7 @@ function Answer({ answer }: { answer: AssistantAnswer }) {
 }
 
 /** Plain text with citation markers drawn as small badges. The text is never treated as HTML. */
-function CitedText({ text, lookup }: { text: string; lookup: Map<string, string> }) {
+function CitedText({ text, lookup }) {
   return (
     <>
       {splitCitations(text).map((seg, i) =>
