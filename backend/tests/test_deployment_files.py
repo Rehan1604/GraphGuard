@@ -220,3 +220,76 @@ def test_ci_runs_both_suites():
     steps = json.dumps(ci)
     for needle in ("pytest", "npm run lint", "vitest", "npm run build"):
         assert needle in steps
+
+
+# ---------- Render and Vercel ----------
+
+@pytest.fixture(scope="module")
+def render():
+    return yaml.safe_load(read(ROOT / "render.yaml"))
+
+
+def render_service(render):
+    (svc,) = render["services"]
+    return svc
+
+
+def test_render_runs_the_backend_dockerfile(render):
+    svc = render_service(render)
+    assert svc["type"] == "web" and svc["runtime"] == "docker"
+    assert (ROOT / svc["dockerfilePath"]).is_file()
+    assert (ROOT / svc["dockerContext"]).is_dir() and (ROOT / svc["dockerfilePath"]).parent == (ROOT / svc["dockerContext"])
+
+
+def test_render_port_matches_the_dockerfile(render):
+    env = {e["key"]: e for e in render_service(render)["envVars"]}
+    docker = read(BACKEND / "Dockerfile")
+    port = re.search(r"EXPOSE\s+(\d+)", docker).group(1)
+    assert env["PORT"]["value"] == port
+    assert f'"--port", "{port}"' in docker
+
+
+def test_render_health_check_is_the_readiness_route(render):
+    from app.main import app
+
+    path = render_service(render)["healthCheckPath"]
+    assert path == "/api/ready"
+    assert any(getattr(r, "path", None) == path for r in app.routes)
+
+
+def test_render_env_vars_are_real_settings_and_hold_no_secrets(render):
+    fields = {f.upper() for f in Settings.model_fields}
+    for e in render_service(render)["envVars"]:
+        key = e["key"]
+        if key.startswith("GRAPHGUARD_"):
+            assert key.removeprefix("GRAPHGUARD_") in fields, key
+        assert not any(w in key for w in ("KEY", "SECRET", "TOKEN", "PASSWORD")), f"{key} must not be in the blueprint"
+
+
+def test_render_cors_values_are_entered_by_hand_not_guessed(render):
+    env = {e["key"]: e for e in render_service(render)["envVars"]}
+    for key in ("GRAPHGUARD_CORS_ORIGINS", "GRAPHGUARD_WS_ALLOWED_ORIGINS"):
+        assert env[key].get("sync") is False and "value" not in env[key]
+    assert env["GRAPHGUARD_ENVIRONMENT"]["value"] == "production"
+
+
+def test_render_trusts_the_proxy_header_only_via_the_environment(render):
+    env = {e["key"]: e for e in render_service(render)["envVars"]}
+    assert env["FORWARDED_ALLOW_IPS"]["value"] == "*"
+    assert "forwarded-allow-ips" not in read(BACKEND / "Dockerfile"), "the image itself must keep uvicorn's safe default"
+
+
+def test_vercel_config_matches_the_frontend_build():
+    cfg = json.loads(read(FRONTEND / "vercel.json"))
+    scripts = json.loads(read(FRONTEND / "package.json"))["scripts"]
+    assert cfg["buildCommand"] == "npm run build" and "build" in scripts
+    assert cfg["outputDirectory"] == "dist"
+    assert "dist" in read(FRONTEND / ".gitignore").split(), "the build output must not be committed"
+    keys = {h["key"] for rule in cfg["headers"] for h in rule["headers"]}
+    assert {"X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy"} <= keys
+
+
+def test_deploy_guide_names_every_variable_it_tells_you_to_set():
+    guide = read(ROOT / "docs" / "DEPLOY.md")
+    for needle in ("VITE_API_URL", "GRAPHGUARD_CORS_ORIGINS", "GRAPHGUARD_WS_ALLOWED_ORIGINS", "FORWARDED_ALLOW_IPS", "/api/ready", "render.yaml", "vercel.json"):
+        assert needle in guide, needle

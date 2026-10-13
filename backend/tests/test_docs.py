@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DOCS = ["README.md", *[f"docs/{n}" for n in ("ARCHITECTURE.md", "DEMO.md", "TRADEOFFS.md", "INTERVIEW.md", "RESUME.md")]]
+DOCS = ["README.md", *[f"docs/{n}" for n in ("ARCHITECTURE.md", "DEMO.md", "TRADEOFFS.md", "INTERVIEW.md", "RESUME.md", "DEPLOY.md")]]
 BANNED = ["production-ready", "catches fraud", "detects fraud", "ai-powered detection", "99%", "events/sec", "ms latency"]
 
 

@@ -112,6 +112,10 @@ flowchart LR
 
 Design notes, trade-offs and the reasoning behind each choice are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/TRADEOFFS.md](docs/TRADEOFFS.md).
 
+## Deploy
+
+The API runs on Render (Docker, see [`render.yaml`](render.yaml)) and the dashboard on Vercel (see [`frontend/vercel.json`](frontend/vercel.json)). Step-by-step instructions, the order that avoids CORS problems, and the free-tier limits are in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Tech stack
 
 | Layer | Tools |
@@ -179,7 +183,7 @@ docs/           architecture, demo script, trade-offs, interview Q&A, resume not
 
 ## Documents
 
-[Architecture](docs/ARCHITECTURE.md) · [Demo script](docs/DEMO.md) · [Trade-offs](docs/TRADEOFFS.md) · [Interview Q&A](docs/INTERVIEW.md) · [Resume notes](docs/RESUME.md)
+[Architecture](docs/ARCHITECTURE.md) · [Deploying](docs/DEPLOY.md) · [Demo script](docs/DEMO.md) · [Trade-offs](docs/TRADEOFFS.md) · [Interview Q&A](docs/INTERVIEW.md) · [Resume notes](docs/RESUME.md)
 
 ---
 *GraphGuard is an educational project. Its alerts describe patterns in synthetic data and are never evidence of wrongdoing by anyone.*

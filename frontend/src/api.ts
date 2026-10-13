@@ -4,7 +4,7 @@ import type {
 } from './types'
 
 // Where the backend lives. Override with VITE_API_URL in frontend/.env.local.
-export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+export const API_URL: string = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '') // no trailing slash
 export const WS_URL: string = API_URL.replace(/^http/, 'ws')
 
 export class ApiError extends Error {

@@ -1,0 +1,27 @@
+# Render Blueprint: deploys the API (backend/) as a Docker web service.
+# The dashboard (frontend/) is deployed separately on Vercel. See docs/DEPLOY.md.
+services:
+  - type: web
+    name: graphguard-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/ready
+    autoDeployTrigger: commit
+    envVars:
+      # The Dockerfile starts uvicorn on 8000; tell Render to route to it.
+      - key: PORT
+        value: "8000"
+      - key: GRAPHGUARD_ENVIRONMENT
+        value: production
+      # Fill these in on the Render dashboard with your Vercel address (scheme + host, no path, no trailing slash),
+      # as a JSON list, e.g. ["https://graphguard.vercel.app"]
+      - key: GRAPHGUARD_CORS_ORIGINS
+        sync: false
+      - key: GRAPHGUARD_WS_ALLOWED_ORIGINS
+        sync: false
+      # Render's proxy sits in front of the app, so trust its X-Forwarded-For to tell visitors apart
+      # (otherwise everyone shares one rate-limit bucket). Safe here because only Render's proxy can reach the container.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
