@@ -1,0 +1,4 @@
+# Optional: the neural embedder for the assistant's retrieval (downloads a ~130 MB model on first use).
+# Without it GraphGuard falls back to an offline embedder automatically.
+-r requirements.txt
+fastembed>=0.3,<1.0

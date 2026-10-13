@@ -19,6 +19,8 @@ from app.db import get_db
 from app.ratelimit import rate_limited
 from app.detection.engine import run_detection
 from app.detection.models import DetectionConfig
+from app.ml.service import score_findings_if_enabled
+from app.simulation.ingest import lookback_minutes
 
 router = APIRouter(prefix="/api/alerts")
 Db = Annotated[sqlite3.Connection, Depends(get_db)]
@@ -28,8 +30,10 @@ Db = Annotated[sqlite3.Connection, Depends(get_db)]
 def scan(db: Db, config: DetectionConfig | None = None) -> ScanSummary:
     """Run the detection rules and save what they find as alerts.
     Safe to repeat: identical patterns never create duplicate alerts."""
-    result = run_detection(core.all_transactions_chronological(db), config)
-    return repo.save_findings(db, result.findings)
+    transactions = core.all_transactions_chronological(db)
+    result = run_detection(transactions, config)
+    triage = score_findings_if_enabled(result.findings, transactions, lookback_minutes(result.config))
+    return repo.save_findings(db, result.findings, triage)
 
 
 @router.get("", response_model=list[AlertSummary])

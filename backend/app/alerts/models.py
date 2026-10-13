@@ -38,6 +38,15 @@ class HistoryEvent(BaseModel):
     created_at: datetime
 
 
+class MlDriver(BaseModel):
+    """One reason the triage model gave: a feature and how far it moved the estimate."""
+
+    label: str
+    value: float
+    effect: float  # change in the estimate caused by this feature (positive = raised it)
+    direction: Literal["raises", "lowers"]
+
+
 class AlertSummary(BaseModel):
     id: int
     rule: str
@@ -51,9 +60,13 @@ class AlertSummary(BaseModel):
     evidence_count: int
     created_at: datetime
     updated_at: datetime
+    ml_score: float | None = None  # triage estimate that this is a genuine pattern; None = not scored
+    ml_verdict: Literal["likely_true", "likely_benign"] | None = None
 
 
 class AlertDetail(AlertSummary):
+    ml_model: str | None = None
+    ml_drivers: list[MlDriver] = []  # why the triage model said what it said
     contributions: list[ScoreContribution]  # why the score is what it is
     evidence: list[Transaction]  # FACTS from the data
     notes: list[Note]  # OPINIONS from people

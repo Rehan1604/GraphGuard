@@ -19,6 +19,7 @@ def isolated_default_database(tmp_path, monkeypatch):
     """No test may touch the real data/graphguard.db, and none may depend on it already existing
     (a fresh CI machine has no such file, which is how a hidden dependency once slipped through)."""
     monkeypatch.setenv("GRAPHGUARD_DATABASE_PATH", str(tmp_path / "default.db"))
+    monkeypatch.setenv("GRAPHGUARD_RAG_EMBEDDER", "lsa")  # tests must never download a neural model
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

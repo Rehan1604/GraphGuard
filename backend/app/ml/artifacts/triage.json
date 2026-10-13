@@ -1,0 +1,300 @@
+{
+  "caveats": [
+    "Trained and tested on SYNTHETIC worlds produced by the same generator. Held-out seeds are new random worlds, not new kinds of world.",
+    "The probability is calibrated on the benchmark. It is not a probability of wrongdoing and needs re-calibration on real data.",
+    "The three benign look-alike types (payroll, split bill, marketplace payout) are fixed designs. The leave-one-out table shows what happens when one type is withheld."
+  ],
+  "feature_set": "shape",
+  "features": [
+    "is_chain",
+    "is_cycle",
+    "is_burst",
+    "is_fan",
+    "rule_points",
+    "n_transactions",
+    "n_accounts",
+    "span_minutes",
+    "amount_cv",
+    "amount_min_max_ratio",
+    "amount_near_median_share",
+    "gap_mean_minutes",
+    "gap_max_minutes",
+    "gap_cv",
+    "ratio_mean",
+    "ratio_min",
+    "distinct_sources",
+    "distinct_targets",
+    "top_pair_share",
+    "outward_share",
+    "context_other_transactions",
+    "evidence_share_of_activity"
+  ],
+  "label_definition": "1 = the alert matches a planted pattern in the benchmark answer key; 0 = benign look-alike, near-miss, or coincidence",
+  "library_versions": {
+    "numpy": "2.5.4",
+    "python": "3.12.14",
+    "scikit-learn": "1.9.1"
+  },
+  "metrics": {
+    "ablation_with_amount_size_features": {
+      "alert_level_test": {
+        "alerts": 2080,
+        "average_precision": 0.9982,
+        "false_alarms_removed": "584/588",
+        "genuine_alerts": 1492,
+        "genuine_alerts_kept_fraction": 0.9538,
+        "genuine_kept": "1423/1492",
+        "kept": 1427,
+        "kept_precision": 0.9972,
+        "roc_auc": 0.9975,
+        "rules_only_precision": 0.7173
+      },
+      "leave_one_lookalike_out": {
+        "marketplace_payout": {
+          "genuine_alerts_still_kept": 0.9846,
+          "suppressed_never_seen_type": 0.9917,
+          "test_alerts": 120
+        },
+        "payroll": {
+          "genuine_alerts_still_kept": 0.9759,
+          "suppressed_never_seen_type": 0.0,
+          "test_alerts": 240
+        },
+        "split_bill": {
+          "genuine_alerts_still_kept": 0.992,
+          "suppressed_never_seen_type": 1.0,
+          "test_alerts": 120
+        }
+      },
+      "note": "Reported to show how much of the apparent skill depends on the generator's amount sizes. NOT shipped."
+    },
+    "alert_level_test": {
+      "alerts": 2080,
+      "average_precision": 0.9911,
+      "false_alarms_removed": "474/588",
+      "genuine_alerts": 1492,
+      "genuine_alerts_kept_fraction": 0.9665,
+      "genuine_kept": "1442/1492",
+      "kept": 1556,
+      "kept_precision": 0.9267,
+      "roc_auc": 0.9829,
+      "rules_only_precision": 0.7173
+    },
+    "alert_level_validation": {
+      "alerts": 693,
+      "average_precision": 0.9893,
+      "false_alarms_removed": "162/199",
+      "genuine_alerts": 494,
+      "genuine_alerts_kept_fraction": 0.9615,
+      "genuine_kept": "475/494",
+      "kept": 512,
+      "kept_precision": 0.9277,
+      "roc_auc": 0.9794,
+      "rules_only_precision": 0.7128
+    },
+    "all_candidates_on_test": [
+      {
+        "average_precision": 0.9758,
+        "features": "shape",
+        "genuine_alerts_kept_fraction": 0.9591,
+        "kept_precision": 0.8736,
+        "model": "logistic",
+        "roc_auc": 0.955
+      },
+      {
+        "average_precision": 0.9887,
+        "features": "shape_and_scale",
+        "genuine_alerts_kept_fraction": 0.9383,
+        "kept_precision": 0.9887,
+        "model": "logistic",
+        "roc_auc": 0.9822
+      },
+      {
+        "average_precision": 0.9911,
+        "features": "shape",
+        "genuine_alerts_kept_fraction": 0.9665,
+        "kept_precision": 0.9267,
+        "model": "gradient_boosting",
+        "roc_auc": 0.9829
+      },
+      {
+        "average_precision": 0.9982,
+        "features": "shape_and_scale",
+        "genuine_alerts_kept_fraction": 0.9538,
+        "kept_precision": 0.9972,
+        "model": "gradient_boosting",
+        "roc_auc": 0.9975
+      }
+    ],
+    "episode_level_test_rules_only": {
+      "alerts_shown": 2080,
+      "patterns_found": "1199/1200",
+      "pooled_precision": 0.7173,
+      "pooled_recall": 0.9992,
+      "precision_range_over_worlds": [
+        0.6716,
+        0.7612
+      ],
+      "worlds": 30
+    },
+    "episode_level_test_with_triage": {
+      "alerts_shown": 1556,
+      "patterns_found": "1150/1200",
+      "pooled_precision": 0.9267,
+      "pooled_recall": 0.9583,
+      "precision_range_over_worlds": [
+        0.8462,
+        0.98
+      ],
+      "worlds": 30
+    },
+    "leave_one_lookalike_out": {
+      "marketplace_payout": {
+        "genuine_alerts_still_kept": 0.9631,
+        "suppressed_never_seen_type": 0.0,
+        "test_alerts": 120
+      },
+      "payroll": {
+        "genuine_alerts_still_kept": 0.9598,
+        "suppressed_never_seen_type": 0.0,
+        "test_alerts": 240
+      },
+      "split_bill": {
+        "genuine_alerts_still_kept": 0.9725,
+        "suppressed_never_seen_type": 0.0,
+        "test_alerts": 120
+      }
+    },
+    "seed_42": {
+      "rules_only": {
+        "alerts_shown": 70,
+        "patterns_found": "40/40",
+        "pooled_precision": 0.7429,
+        "pooled_recall": 1.0,
+        "precision_range_over_worlds": [
+          0.7429,
+          0.7429
+        ],
+        "worlds": 1
+      },
+      "with_triage": {
+        "alerts_shown": 55,
+        "patterns_found": "39/40",
+        "pooled_precision": 0.9273,
+        "pooled_recall": 0.975,
+        "precision_range_over_worlds": [
+          0.9273,
+          0.9273
+        ],
+        "worlds": 1
+      }
+    }
+  },
+  "model": "gradient_boosting",
+  "model_comparison_validation": [
+    {
+      "features": "shape",
+      "model": "logistic",
+      "validation_average_precision": 0.9811,
+      "validation_roc_auc": 0.9654
+    },
+    {
+      "features": "shape_and_scale",
+      "model": "logistic",
+      "validation_average_precision": 0.9965,
+      "validation_roc_auc": 0.9947
+    },
+    {
+      "features": "shape",
+      "model": "gradient_boosting",
+      "validation_average_precision": 0.9893,
+      "validation_roc_auc": 0.9794
+    },
+    {
+      "features": "shape_and_scale",
+      "model": "gradient_boosting",
+      "validation_average_precision": 0.9981,
+      "validation_roc_auc": 0.9974
+    }
+  ],
+  "sha256": "147a17bdf3df7f20ab2979d59c63efdfe9d7c338cb92d11ae350fa1b509df4b6",
+  "test_seeds": [
+    201,
+    202,
+    203,
+    204,
+    205,
+    206,
+    207,
+    208,
+    209,
+    210,
+    211,
+    212,
+    213,
+    214,
+    215,
+    216,
+    217,
+    218,
+    219,
+    220,
+    221,
+    222,
+    223,
+    224,
+    225,
+    226,
+    227,
+    228,
+    229,
+    230
+  ],
+  "threshold": 0.3714,
+  "threshold_rule": "keeps 95% of genuine alerts on the validation worlds",
+  "train_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "validation_seeds": [
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40
+  ],
+  "version": "triage-gradient_boosting-shape-v1"
+}

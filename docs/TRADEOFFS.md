@@ -9,7 +9,9 @@ Say these before an interviewer finds them.
 | SQLite | Zero setup, fine for a demo | One writer; not for heavy concurrent load |
 | One process | In-memory stream, simulator and rate limiter stay consistent | Cannot scale out without a shared store (e.g. Redis) |
 | In-memory rate limiter | Simple | Per process; clients behind one proxy look like one |
-| TF-IDF retrieval | Offline, deterministic, no embeddings model | Weaker on paraphrase than embeddings |
+| Swappable embedder (neural when installed, offline LSA otherwise) | Tests and free-tier hosting need no download; one interface | The offline embedder measured no better than keyword TF-IDF on 30 questions; the neural one is unmeasured here |
+| ML triage on top of rules | Higher precision (71.7% to 92.7% on held-out synthetic worlds) | Recall falls ~4 points; does not generalise to look-alike types it never saw (0% removed) |
+| Shape features, not amount sizes | Avoids fitting the generator's numbers | Lower headline precision than the amount-aware ablation (92.7% vs 99.7%) |
 | Body limit via Content-Length | Cheap | Does not stop a chunked upload with no length |
 | No authentication | Keeps scope on detection | Not safe to expose publicly |
 

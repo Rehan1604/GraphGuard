@@ -86,6 +86,14 @@ export default function Alerts({ version, selectedId, onSelect, search, onSearch
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-medium text-slate-100">{RULE_LABELS[a.rule]}</span>
                           <PriorityBadge priority={a.priority} />
+                          {a.ml_score !== null && a.ml_score !== undefined && (
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-xs tabular-nums ${a.ml_verdict === 'likely_benign' ? 'border-slate-600 text-slate-400' : 'border-emerald-500/40 text-emerald-300'}`}
+                              title="ML triage: estimated chance this is a genuine pattern"
+                            >
+                              ML {Math.round(a.ml_score * 100)}%
+                            </span>
+                          )}
                           <span className="ml-auto text-sm tabular-nums text-slate-300">{a.risk_score}</span>
                         </div>
                         <div className="mt-1 truncate font-mono text-xs text-slate-400">#{a.id} {a.accounts.slice(0, 3).join(' > ')}</div>

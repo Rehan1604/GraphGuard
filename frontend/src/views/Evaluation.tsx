@@ -183,6 +183,8 @@ function Results({ report: r }: { report: EvaluationReport }) {
         </div>
       </div>
 
+      {r.triage && <TriageBlock triage={r.triage} graph={r.graph} />}
+
       <DelayBlock delay={r.delay} />
       {r.sweeps.length > 0 && r.sweeps.map((s) => <SweepTable key={s.parameter} sweep={s} />)}
 
@@ -246,5 +248,31 @@ function SweepTable({ sweep }: { sweep: Sweep }) {
         </table>
       </div>
     </div>
+  )
+}
+
+function TriageBlock({ triage, graph }: { triage: NonNullable<EvaluationReport['triage']>; graph: EvaluationReport['graph'] }) {
+  const t = triage.result
+  return (
+    <section className="rounded-lg border border-navy-600 bg-navy-800 p-3">
+      <h3 className="text-sm font-semibold text-slate-100">Graph engine + ML triage ({triage.model_version})</h3>
+      <table className="mt-2 w-full text-left text-sm">
+        <thead className="text-xs uppercase tracking-wider text-slate-400">
+          <tr><th className="py-1 font-medium">Measure</th><th className="py-1 font-medium">Rules only</th><th className="py-1 font-medium">Rules + ML</th></tr>
+        </thead>
+        <tbody>
+          <tr><td className="py-1">Alerts raised</td><td className="tabular-nums">{graph.findings}</td><td className="tabular-nums">{t.findings}</td></tr>
+          <tr><td className="py-1">Precision</td><td className="tabular-nums">{formatRate(graph.precision)}</td><td className="tabular-nums">{formatRate(t.precision)}</td></tr>
+          <tr><td className="py-1">Recall (strict)</td><td className="tabular-nums">{formatRate(graph.recall)}</td><td className="tabular-nums">{formatRate(t.recall)}</td></tr>
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-slate-400">
+        {triage.alerts_removed} alerts removed. {triage.seed_overlaps_training && 'This world was used to train or tune the model, so these numbers are optimistic. '}
+        Honest held-out numbers are in the model metadata, and the caveats below matter.
+      </p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-slate-400">
+        {triage.caveats.map((text) => <li key={text}>{text}</li>)}
+      </ul>
+    </section>
   )
 }

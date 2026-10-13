@@ -14,7 +14,9 @@ flowchart LR
     ING -->|publish| HUB[Event hub<br/>sequence numbers + replay]
     HUB -->|WebSocket| UI[React dashboard]
     API --> UI
-    ALR --> RAG[Assistant<br/>facts + guidance + citations]
+    DET --> ML[ML triage<br/>calibrated classifier]
+    ML --> ALR
+    ALR --> RAG[Assistant<br/>facts + vector retrieval + citations]
     RAG -->|optional| LLM[(LLM provider)]
     EVAL[Evaluation<br/>labelled benchmark] -.measures.-> DET
 ```
@@ -26,12 +28,15 @@ flowchart LR
 | Detection | Look at who paid whom and flag four shapes: pass-through chain, circular flow, burst, many-counterparty fan | `app/detection/` |
 | Alerts | Remember findings, avoid duplicates, track review state and comments | `app/alerts/` |
 | Real-time | Push new events to the browser, recover after a disconnect | `app/realtime.py` |
-| Assistant | Explain an alert using only stored facts and a small guidance library | `app/rag/` |
+| ML triage | Estimate whether each rule alert is a genuine pattern or a benign look-alike, with reasons | `app/ml/` |
+| Assistant (RAG) | Retrieve guidance and similar past cases by meaning from a SQLite vector store, then explain an alert from stored facts | `app/rag/` |
 | Evaluation | Score the detectors against labelled synthetic cases | `app/evaluation/` |
 | Hardening | Config checks, logs, limits, safe errors, headers | `app/config.py`, `middleware.py`, `ratelimit.py`, `logging_config.py` |
 
 ## Decisions worth defending
-- **Rules, not a trained model.** With no real labelled data, rules are explainable and testable. Every alert says which rule fired and why.
+- **Rules find, a model ranks.** Rules stay the source of alerts because they are explainable and testable. A trained classifier then triages them: it cannot create alerts, only re-rank or hide ones the rules raised, and if it is absent the rules run alone.
+- **Shape features only.** Amount-size features scored higher but fit the generator; held-out look-alike tests showed the model does not generalise to unseen look-alike types either. Both limits are stated in the model metadata and the UI.
+- **Swappable embedder.** One interface, a neural model when available and an offline one otherwise, so tests are deterministic and nothing needs a download.
 - **Scores are points, not probabilities.** Contributions are summed and capped at 100. Priority: low under 40, medium 40-69, high 70+.
 - **Integer cents.** Floating point cannot represent money exactly.
 - **Idempotent ingest.** Same id and same body: accepted again harmlessly (200). Same id, different body: rejected (409).

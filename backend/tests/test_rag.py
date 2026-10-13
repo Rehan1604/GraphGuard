@@ -7,15 +7,18 @@ from pydantic import SecretStr
 
 from app.alerts.models import AlertDetail
 from app.config import Settings, get_settings
+from app.db import connect, init_db
 from app.detection.engine import run_detection
 from app.main import app
 from app.rag.chunking import chunk_document, load_chunks, parse_front_matter
 from app.rag.facts import build_facts
 from app.rag.grounding import Pseudonymizer, find_accusatory_language, parse_sections, validate_citations
 from app.rag.llm import AnthropicClient, OpenAICompatibleClient, build_client, describe_provider
-from app.rag.retrieval import TfidfIndex, tokenize
+from app.rag.embeddings import LsaEmbedder
+from app.rag.index import Retriever
+from app.rag.lexical import tokenize
 from app.rag.routes import get_llm
-from app.rag.service import answer_question, get_index, retrieve_for_alert
+from app.rag.service import answer_question, retrieve_for_alert
 from tests.test_alerts import chain_client  # noqa: F401  (fixture)
 from tests.test_detection import scenario
 
@@ -37,8 +40,21 @@ def detail_for(rule: str, accounts_first: str, extra=None) -> AlertDetail:
 
 
 @pytest.fixture(scope="module")
-def index():
-    return TfidfIndex(load_chunks())
+def retriever():
+    """Meaning-based retriever using the offline embedder, so tests never need a download."""
+    chunks = load_chunks()
+    embedder = LsaEmbedder()
+    embedder.fit([c.index_text for c in chunks])
+    return Retriever(chunks, embedder, "test")
+
+
+@pytest.fixture
+def conn(tmp_path):
+    path = tmp_path / "rag.db"
+    init_db(path)
+    c = connect(path)
+    yield c
+    c.close()
 
 
 GOOD = (
@@ -63,8 +79,8 @@ def openai_client(reply, calls=None, status=200, key="sk-secret"):
 # ---- chunking ------------------------------------------------------------------
 def test_library_is_chunked_by_section_with_metadata():
     chunks = load_chunks()
-    assert len(chunks) == 23 and len({c.id for c in chunks}) == 23
-    assert {c.source for c in chunks} >= {"pass_through_chains.md", "circular_flows.md", "reviewing_alerts.md"}
+    assert len(chunks) == 42 and len({c.id for c in chunks}) == 42
+    assert {c.source for c in chunks} >= {"pass_through_chains.md", "circular_flows.md", "reviewing_alerts.md", "reading_ml_scores.md", "learning_from_past_cases.md"}
     first = next(c for c in chunks if c.id == "pass_through_chains#3")
     assert (first.title, first.section, first.rules) == ("Pass-through chains", "Innocent explanations", "pass_through_chain")
     assert all(c.text and c.section and c.title for c in chunks)
@@ -88,32 +104,32 @@ def test_tokenizer_drops_filler_and_normalises_plurals():
     assert tokenize("The accounts are forwarding transfers") == ["account", "forwarding", "transfer"]
 
 
-def test_retrieval_ranks_the_relevant_chunk_first(index):
-    top, score = index.search("money moved quickly through several accounts in a chain", rule="pass_through_chain")[0]
+def test_retrieval_ranks_the_relevant_chunk_first(retriever, conn):
+    top, score = retriever.search(conn, "money moved quickly through several accounts in a chain", rule="pass_through_chain")[0]
     assert top.source == "pass_through_chains.md" and 0 < score <= 1
 
 
-def test_rule_filter_blocks_other_patterns_but_allows_general_guidance(index):
-    hits = index.search("loop circular money returned", rule="burst", top_k=10)
+def test_rule_filter_blocks_other_patterns_but_allows_general_guidance(retriever, conn):
+    hits = retriever.search(conn, "loop circular money returned", rule="burst", top_k=10)
     assert hits and all(c.rules in ("burst", "general") for c, _ in hits)
 
 
-def test_unrelated_question_retrieves_nothing(index):
-    assert index.search("recipe for chocolate cake", top_k=5) == []
+def test_unrelated_question_retrieves_nothing(retriever, conn):
+    assert retriever.search(conn, "recipe for chocolate cake", top_k=5) == []
 
 
-def test_retrieval_is_deterministic(index):
+def test_retrieval_is_deterministic(retriever, conn):
     q = "what should I check next"
-    assert index.search(q, rule="cycle") == index.search(q, rule="cycle")
+    assert retriever.search(conn, q, rule="cycle") == retriever.search(conn, q, rule="cycle")
 
 
-def test_every_alert_gets_standard_guidance_even_for_odd_questions(index):
-    assert index.search("recipe for chocolate cake", rule="cycle") == []  # the question alone matches nothing
-    passages = retrieve_for_alert(index, "cycle", "recipe for chocolate cake")
+def test_every_alert_gets_standard_guidance_even_for_odd_questions(retriever, conn):
+    assert retriever.search(conn, "recipe for chocolate cake", rule="cycle") == []  # the question alone matches nothing
+    passages = retrieve_for_alert(retriever, conn, "cycle", "recipe for chocolate cake")
     assert [p.id for p in passages] == [f"K{i}" for i in range(1, len(passages) + 1)]
     assert {"Innocent explanations", "What to check next"} <= {p.section for p in passages}
     assert all(p.source == "circular_flows.md" or p.title in ("Reviewing an alert", "Reading risk scores") for p in passages)
-    matched = retrieve_for_alert(index, "cycle", "why does a loop matter")
+    matched = retrieve_for_alert(retriever, conn, "cycle", "why does a loop matter")
     assert matched[0].via == "similarity" and matched[0].score > 0
     assert len({p.id for p in passages}) == len(passages) and len({p.text for p in passages}) == len(passages)
 
@@ -173,8 +189,8 @@ def test_section_parsing_handles_markdown_noise_and_unknown_layouts():
 
 
 # ---- rule-based explanation (no AI) ------------------------------------------------
-def test_without_a_provider_the_summary_is_rule_based_and_says_so(index):
-    a = answer_question(detail_for("pass_through_chain", "A1"), "Why was this flagged?", index, None, True)
+def test_without_a_provider_the_summary_is_rule_based_and_says_so(retriever, conn):
+    a = answer_question(detail_for("pass_through_chain", "A1"), "Why was this flagged?", retriever, conn, None, True)
     e = a.explanation
     assert e.mode == "rule_based" and "not AI-generated" in e.label and e.provider is None
     assert [s.heading for s in e.sections] == ["Why it was flagged", "Possible innocent explanations", "Suggested next steps for the analyst"]
@@ -184,16 +200,16 @@ def test_without_a_provider_the_summary_is_rule_based_and_says_so(index):
     assert all("[" in i for s in e.sections[1:] for i in s.items)  # every guidance line cites its source
 
 
-def test_turning_ai_off_never_calls_the_provider(index):
+def test_turning_ai_off_never_calls_the_provider(retriever, conn):
     calls = []
-    a = answer_question(detail_for("cycle", "C1"), "why?", index, openai_client(GOOD, calls), use_ai=False)
+    a = answer_question(detail_for("cycle", "C1"), "why?", retriever, conn, openai_client(GOOD, calls), use_ai=False)
     assert calls == [] and a.explanation.mode == "rule_based" and a.explanation.warnings == []
 
 
 # ---- AI path (provider simulated with httpx.MockTransport: no real network) ---------
-def test_ai_answer_is_labelled_grounded_and_de_aliased(index):
+def test_ai_answer_is_labelled_grounded_and_de_aliased(retriever, conn):
     calls = []
-    a = answer_question(detail_for("pass_through_chain", "A1"), "Why was A2 flagged?", index, openai_client(GOOD, calls), True)
+    a = answer_question(detail_for("pass_through_chain", "A1"), "Why was A2 flagged?", retriever, conn, openai_client(GOOD, calls), True)
     e = a.explanation
     assert e.mode == "ai" and "AI-generated" in e.label and e.provider == "openai_compatible" and e.model == "test-model"
     assert "A1, A2, A3 and A4" in e.sections[0].items[0]  # aliases swapped back to real ids
@@ -204,24 +220,24 @@ def test_ai_answer_is_labelled_grounded_and_de_aliased(index):
     assert "Not sent" not in e.privacy_note and "Never sent" in e.privacy_note
 
 
-def test_ai_request_never_contains_real_account_ids(index):
+def test_ai_request_never_contains_real_account_ids(retriever, conn):
     calls = []
     d = detail_for("pass_through_chain", "A1")
-    answer_question(d, "Why did A1 send money to A2?", index, openai_client(GOOD, calls), True)
+    answer_question(d, "Why did A1 send money to A2?", retriever, conn, openai_client(GOOD, calls), True)
     body = calls[0].content.decode()
     for real in ("A1", "A2", "A3", "A4"):
         assert f'"{real}"' not in body and f" {real} " not in body and f"{real}." not in body.replace("ACCT_", "")
 
 
-def test_invented_citations_are_removed_and_reported(index):
+def test_invented_citations_are_removed_and_reported(retriever, conn):
     text = GOOD.replace("[F2]", "[F2] and also [F99]")
-    a = answer_question(detail_for("cycle", "C1"), "why", index, openai_client(text), True)
+    a = answer_question(detail_for("cycle", "C1"), "why", retriever, conn, openai_client(text), True)
     assert a.explanation.mode == "ai" and a.explanation.invalid_citations_removed == ["F99"]
     assert "[F99]" not in json.dumps(a.explanation.model_dump()) and any("F99" in w for w in a.explanation.warnings)
 
 
-def test_answer_with_no_valid_citation_is_discarded(index):
-    a = answer_question(detail_for("cycle", "C1"), "why", index, openai_client("Why it was flagged\n- Looks odd.\n- Trust me [F77]."), True)
+def test_answer_with_no_valid_citation_is_discarded(retriever, conn):
+    a = answer_question(detail_for("cycle", "C1"), "why", retriever, conn, openai_client("Why it was flagged\n- Looks odd.\n- Trust me [F77]."), True)
     assert a.explanation.mode == "rule_based" and any("cited none" in w for w in a.explanation.warnings)
 
 
@@ -235,20 +251,20 @@ def test_answer_with_no_valid_citation_is_discarded(index):
         ({"unexpected": True}, 200, "unexpected response shape"),
     ],
 )
-def test_provider_failures_fall_back_without_leaking_secrets(index, reply, status, expected):
-    a = answer_question(detail_for("cycle", "C1"), "why", index, openai_client(reply, status=status, key="sk-VERY-SECRET"), True)
+def test_provider_failures_fall_back_without_leaking_secrets(retriever, conn, reply, status, expected):
+    a = answer_question(detail_for("cycle", "C1"), "why", retriever, conn, openai_client(reply, status=status, key="sk-VERY-SECRET"), True)
     assert a.explanation.mode == "rule_based" and a.explanation.sections
     joined = " ".join(a.explanation.warnings)
     assert expected in joined and "sk-VERY-SECRET" not in joined and "Showing the rule-based summary" in joined
 
 
-def test_unhedged_crime_language_triggers_a_warning_but_not_a_verdict(index):
+def test_unhedged_crime_language_triggers_a_warning_but_not_a_verdict(retriever, conn):
     text = GOOD.replace("[K1].", "[K1].\n- This is obviously fraud [F1].")
-    a = answer_question(detail_for("cycle", "C1"), "why", index, openai_client(text), True)
+    a = answer_question(detail_for("cycle", "C1"), "why", retriever, conn, openai_client(text), True)
     assert a.explanation.mode == "ai" and any("without hedging" in w for w in a.explanation.warnings)
 
 
-def test_anthropic_request_shape_and_response_parsing(index):
+def test_anthropic_request_shape_and_response_parsing(retriever, conn):
     calls = []
 
     def handler(request):
@@ -256,7 +272,7 @@ def test_anthropic_request_shape_and_response_parsing(index):
         return httpx.Response(200, json={"content": [{"type": "text", "text": GOOD}]})
 
     client = AnthropicClient("key-123", "some-model", None, 5, transport=httpx.MockTransport(handler))
-    a = answer_question(detail_for("cycle", "C1"), "why", index, client, True)
+    a = answer_question(detail_for("cycle", "C1"), "why", retriever, conn, client, True)
     sent = json.loads(calls[0].content)
     assert a.explanation.mode == "ai" and a.explanation.provider == "anthropic"
     assert calls[0].headers["x-api-key"] == "key-123" and calls[0].headers["anthropic-version"]
@@ -343,7 +359,7 @@ def test_status_and_knowledge_endpoints(client, monkeypatch):
         monkeypatch.undo()
         get_settings.cache_clear()
     lib = client.get("/api/knowledge").json()
-    assert len(lib) == 6 and {"source", "title", "rules", "sections"} <= set(lib[0])
+    assert len(lib) == 11 and {"source", "title", "rules", "sections"} <= set(lib[0])
     hits = client.get("/api/knowledge/search", params={"q": "money returned to the starting account", "rule": "cycle"}).json()
     assert hits and hits[0]["source"] == "circular_flows.md" and hits[0]["score"] > 0
     assert client.get("/api/knowledge/search", params={"q": ""}).status_code == 422

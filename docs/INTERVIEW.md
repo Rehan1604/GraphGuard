@@ -10,7 +10,7 @@ Short answers first. Add detail only if they ask.
 
 ## Detection
 5. **How does detection work?** I build a graph where accounts are nodes and transfers are edges, then run four rules: pass-through chain, circular flow, burst, and fan.
-6. **Why rules, not machine learning?** There is no real labelled data, and rules are explainable: each alert says which rule fired and why.
+6. **Where is the ML, and why rules plus ML?** Rules generate alerts because they are explainable. A gradient-boosting classifier then triages those alerts using 22 shape features (timing, amount regularity, counterparty concentration), because many alerts are benign look-alikes like payroll. On 30 held-out synthetic worlds precision rose from 71.7% to 92.7% and recall fell from 99.9% to 95.8%. The honest limits: it is synthetic data from one generator, and when I hid one look-alike type during training the model removed 0% of it, so it is a filter for known look-alikes, not a general benign detector.
 7. **What is a pass-through chain?** Money enters an account and leaves soon after, again and again, like a relay.
 8. **How do you find cycles?** Depth-first search over the transfer graph with limits on length and time. A loop only counts if its smallest transfer is at least 80% of its largest, because a real round trip brings back about the same money. Loops that are the same route are de-duplicated.
 9. **What does the risk score mean?** Points from the rules, capped at 100. Low under 40, medium 40-69, high 70+. It is not a probability.
@@ -33,10 +33,10 @@ Short answers first. Add detail only if they ask.
 20. **Why do you check the Origin on the WebSocket?** Browsers don't apply CORS to WebSockets, so I check it myself.
 
 ## Assistant (RAG)
-21. **What is RAG here?** Retrieval-augmented generation: find relevant guidance text, combine with facts from the database, then explain.
+21. **What is RAG here?** Retrieval-augmented generation: embed a guidance library and past reviewed cases into a SQLite vector store, retrieve by cosine similarity, combine with database facts, then explain with validated citations ([F] facts, [K] guidance, [C] cases).
 22. **How do you stop it making things up?** Facts are computed from the database and labelled F1, F2...; guidance is labelled K1...; citations are validated; accusatory wording is flagged. A rule-based fallback is used when no model is set.
 23. **What leaves your machine if an LLM is configured?** Pseudonymized ids (ACCT_A, ...) and facts. Names, notes and analyst names are never sent.
-24. **Why TF-IDF and not embeddings?** Offline, deterministic, and good enough for six short documents. Embeddings would help for paraphrase.
+24. **Why a swappable embedder?** A neural model (bge-small via fastembed) needs a download, so tests and the free hosting tier use an offline LSA embedder. On my 30-question set the offline one scored no better than keyword TF-IDF (hit@3 0.700 vs 0.733), which I report as is; the neural model is optional and I have not quoted a number for it.
 
 ## Evaluation
 25. **How good is it?** On my synthetic benchmark (seed 42): precision 52/70 (74.3%), recall 40/40. Across 20 seeds precision was 66.7%-74.6%, and 69.4%-75.0% on 20 seeds I kept aside. The baseline got 23.2% precision.

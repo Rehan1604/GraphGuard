@@ -49,6 +49,15 @@ def build_facts(detail: AlertDetail, name: Callable[[str], str] = lambda a: a) -
         f"{detail.priority}. The score is the sum of the rule's points, not a probability of fraud.",
         "summary",
     )
+    if detail.ml_score is not None:
+        reasons = "; ".join(f"{d.label} {d.direction} the estimate" for d in detail.ml_drivers[:3])
+        verdict = "likely a genuine pattern" if detail.ml_verdict == "likely_true" else "likely a benign look-alike or coincidence"
+        add(
+            f"ML triage model {detail.ml_model} estimates a {detail.ml_score:.0%} likelihood that this alert matches a genuine "
+            f"pattern (verdict: {verdict})." + (f" Main drivers: {reasons}." if reasons else "")
+            + " The estimate is calibrated on synthetic benchmark data; it ranks alerts for review and is not a probability of wrongdoing.",
+            "triage",
+        )
     if ev:
         accounts = {a for t in ev for a in (t.source_account_id, t.target_account_id)}
         add(

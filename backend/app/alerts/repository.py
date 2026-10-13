@@ -9,6 +9,7 @@ from app.alerts.models import (
     AlertDetail,
     AlertSummary,
     HistoryEvent,
+    MlDriver,
     Note,
     NoteCreate,
     ScanSummary,
@@ -16,6 +17,7 @@ from app.alerts.models import (
 )
 from app.alerts.workflow import ALLOWED_TRANSITIONS, COMMENT_REQUIRED, check_transition
 from app.detection.models import Finding, ScoreContribution
+from app.ml.model import TriageScore
 
 Outcome = Literal["created", "updated", "unchanged"]
 
@@ -55,7 +57,14 @@ def _store_finding_fields(f: Finding) -> tuple:
     )
 
 
-def upsert_finding(conn: sqlite3.Connection, f: Finding) -> tuple[int, Outcome]:
+def _ml_fields(score: TriageScore | None) -> tuple:
+    if score is None:
+        return (None, None, None, None)
+    drivers = [{"label": d.label, "value": d.value, "effect": d.effect, "direction": d.direction} for d in score.drivers]
+    return (round(score.probability, 4), score.verdict, score.model_version, json.dumps(drivers))
+
+
+def upsert_finding(conn: sqlite3.Connection, f: Finding, triage: TriageScore | None = None) -> tuple[int, Outcome]:
     """Turn a detection finding into a stored alert WITHOUT creating duplicates.
     (Does not commit: save_findings commits once at the end.)"""
     ids = set(f.transaction_ids)
@@ -88,9 +97,9 @@ def upsert_finding(conn: sqlite3.Connection, f: Finding) -> tuple[int, Outcome]:
             conn.execute(
                 """UPDATE alerts SET dedup_key=?, risk_score=?, priority=?, summary=?,
                    accounts_json=?, contributions_json=?, window_start=?, window_end=?,
-                   status=?, updated_at=? WHERE id=?""",
+                   status=?, updated_at=?, ml_score=?, ml_verdict=?, ml_model=?, ml_drivers_json=? WHERE id=?""",
                 (key, score, priority, summary, accounts, contributions, w_start, w_end,
-                 new_status, core.now_iso(), alert_id),
+                 new_status, core.now_iso(), *_ml_fields(triage), alert_id),
             )
             for tx_id in ids - ev:
                 conn.execute(
@@ -109,9 +118,10 @@ def upsert_finding(conn: sqlite3.Connection, f: Finding) -> tuple[int, Outcome]:
     now = core.now_iso()
     cur = conn.execute(
         """INSERT INTO alerts (dedup_key, rule, risk_score, priority, summary, accounts_json,
-           contributions_json, window_start, window_end, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)""",
-        (key, f.rule, score, priority, summary, accounts, contributions, w_start, w_end, now, now),
+           contributions_json, window_start, window_end, status, created_at, updated_at,
+           ml_score, ml_verdict, ml_model, ml_drivers_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?)""",
+        (key, f.rule, score, priority, summary, accounts, contributions, w_start, w_end, now, now, *_ml_fields(triage)),
     )
     alert_id = cur.lastrowid
     for tx_id in ids:
@@ -122,12 +132,16 @@ def upsert_finding(conn: sqlite3.Connection, f: Finding) -> tuple[int, Outcome]:
     return alert_id, "created"
 
 
-def save_findings_detailed(conn: sqlite3.Connection, findings: list[Finding]) -> list[tuple[int, Outcome]]:
-    """Save findings all-or-nothing. Returns (alert_id, outcome) for each."""
+def save_findings_detailed(
+    conn: sqlite3.Connection, findings: list[Finding], triage: list[TriageScore | None] | None = None
+) -> list[tuple[int, Outcome]]:
+    """Save findings all-or-nothing. Returns (alert_id, outcome) for each.
+    `triage` (optional) holds one model score per finding, in the same order."""
     results: list[tuple[int, Outcome]] = []
+    scores = triage or [None] * len(findings)
     try:
-        for f in findings:
-            results.append(upsert_finding(conn, f))
+        for f, t in zip(findings, scores):
+            results.append(upsert_finding(conn, f, t))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -135,9 +149,11 @@ def save_findings_detailed(conn: sqlite3.Connection, findings: list[Finding]) ->
     return results
 
 
-def save_findings(conn: sqlite3.Connection, findings: list[Finding]) -> ScanSummary:
+def save_findings(
+    conn: sqlite3.Connection, findings: list[Finding], triage: list[TriageScore | None] | None = None
+) -> ScanSummary:
     counts = {"created": 0, "updated": 0, "unchanged": 0}
-    for _, outcome in save_findings_detailed(conn, findings):
+    for _, outcome in save_findings_detailed(conn, findings, triage):
         counts[outcome] += 1
     return ScanSummary(findings=len(findings), **counts)
 
@@ -155,6 +171,7 @@ def _summary(row: sqlite3.Row) -> AlertSummary:
         evidence_count=row["evidence_count"],
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"]),
+        ml_score=row["ml_score"], ml_verdict=row["ml_verdict"],
     )
 
 
@@ -193,6 +210,8 @@ def get_alert_detail(conn, alert_id: int) -> AlertDetail | None:
     ).fetchall()
     return AlertDetail(
         **_summary(row).model_dump(),
+        ml_model=row["ml_model"],
+        ml_drivers=[MlDriver(**d) for d in json.loads(row["ml_drivers_json"] or "[]")],
         contributions=[ScoreContribution(**c) for c in json.loads(row["contributions_json"])],
         evidence=[core.row_to_transaction(r) for r in evidence_rows],
         notes=_notes(conn, alert_id),

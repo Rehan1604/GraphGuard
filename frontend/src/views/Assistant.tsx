@@ -103,6 +103,7 @@ function Answer({ answer }: { answer: AssistantAnswer }) {
   const lookup = new Map<string, string>([
     ...answer.facts.map((f) => [f.id, f.text] as [string, string]),
     ...answer.guidance.map((g) => [g.id, `${g.title}: ${g.section}`] as [string, string]),
+    ...(answer.similar_cases ?? []).map((c) => [c.id, `Alert #${c.alert_id} (${c.status})`] as [string, string]),
   ])
 
   return (
@@ -139,6 +140,29 @@ function Answer({ answer }: { answer: AssistantAnswer }) {
           ))}
         </ul>
       </Card>
+
+      {(answer.similar_cases ?? []).length > 0 && (
+        <Card title="Similar past cases in this workspace (case memory)">
+          <ul className="space-y-2 text-sm">
+            {(answer.similar_cases ?? []).map((c) => (
+              <li key={c.id} id={`src-${c.id}`} className="rounded-lg border border-navy-700 bg-navy-800 p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs text-violet-300">{c.id}</span>
+                  <span className="text-slate-100">Alert #{c.alert_id}, {c.status}</span>
+                  <span className="ml-auto text-xs text-slate-400">match {c.score.toFixed(2)}</span>
+                </div>
+                <p className="mt-1 text-slate-300">Reviewer wrote: {c.comment}</p>
+                <p className="mt-1 text-xs text-slate-500">Only the outcome (not this comment) is sent to an AI provider.</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {answer.retrieval && (
+        <p className="text-xs text-slate-500">
+          Retrieval: {answer.retrieval.embedder} over {answer.retrieval.library_passages} passages. {answer.retrieval.note}
+        </p>
+      )}
 
       <Card title="3. Explanation (advisory)">
         <div className="mb-3 flex flex-wrap items-start gap-2">

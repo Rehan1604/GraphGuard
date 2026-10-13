@@ -71,7 +71,16 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None  # e.g. http://localhost:11434/v1 for a local Ollama server
     llm_timeout_seconds: float = 30.0
 
-    @field_validator("llm_model", "llm_base_url", "llm_api_key", "docs_enabled", mode="before")
+    # Machine-learning triage of alerts. Off = the rules work alone, exactly as before.
+    ml_enabled: bool = True
+    ml_model_path: Path | None = None  # None = the model bundled with the app
+
+    # Retrieval for the assistant. "auto" = a neural embedding model if one is installed and available,
+    # otherwise the built-in offline embedder. "lsa" always uses the offline one (what the tests use).
+    rag_embedder: Literal["auto", "fastembed", "lsa"] = "auto"
+    rag_embedding_model: str = "BAAI/bge-small-en-v1.5"
+
+    @field_validator("llm_model", "llm_base_url", "llm_api_key", "docs_enabled", "ml_model_path", mode="before")
     @classmethod
     def blank_means_unset(cls, value):
         """`GRAPHGUARD_LLM_MODEL=` (empty) must mean 'not set', not 'set to an empty string'."""
@@ -120,6 +129,8 @@ class Settings(BaseSettings):
             "llm_provider": self.llm_provider,
             "llm_model": self.llm_model,
             "llm_key_present": self.llm_api_key is not None,
+            "ml_enabled": self.ml_enabled,
+            "rag_embedder": self.rag_embedder,
         }
 
 
