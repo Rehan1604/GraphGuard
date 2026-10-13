@@ -2,7 +2,7 @@ import random
 import time
 from datetime import timedelta
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -11,6 +11,7 @@ from app.detection.models import DetectionConfig
 from app.evaluation.baseline import Detection, baseline_detect
 from app.evaluation.dataset import Episode, LabelledDataset, build_benchmark, dataset_from_simulator
 from app.evaluation.metrics import DelayStats, DetectorResult, Rate, StreamHit, measure_delay, score_detector
+from app.ml.service import score_findings_if_enabled
 from app.schemas import Transaction
 from app.simulation.ingest import lookback_minutes
 
@@ -69,9 +70,30 @@ class Timing(BaseModel):
     milliseconds_per_transaction: float
 
 
+class TriageEvaluation(BaseModel):
+    """The rule alerts re-filtered by the trained triage model, scored exactly like the rules alone."""
+
+    model_version: str
+    threshold: float
+    result: DetectorResult
+    alerts_removed: int
+    seed_overlaps_training: bool  # True = this world was used to train or tune the model, so these numbers are optimistic
+    recorded: dict[str, Any]  # what was measured when the model was trained, on separate held-out worlds
+    caveats: list[str]
+
+
+TRIAGE_CAVEATS = [
+    "The model was trained on synthetic worlds from the same generator as this benchmark. Held-out worlds are new random draws, not new kinds of world.",
+    "It filters out alerts it recognises as the benign look-alike types it was trained on. Withholding a look-alike type during training, it removed none of that type: it has not learned a general idea of 'benign'.",
+    "Removing alerts costs recall: some genuine patterns are filtered out. Both numbers are shown so the trade is visible.",
+    "The score is a probability calibrated on the benchmark. It is a review-priority aid, not a statement about anyone's intent.",
+]
+
+
 class EvaluationReport(BaseModel):
     dataset: DatasetSummary
     graph: DetectorResult
+    triage: TriageEvaluation | None = None
     baseline: DetectorResult
     delay: DelayStats
     sweeps: list[Sweep]
@@ -124,10 +146,40 @@ def negative_control(dataset: LabelledDataset, detections: list[Detection], seed
     )
 
 
+def _triage_evaluation(dataset: LabelledDataset, findings, cfg: DetectionConfig) -> TriageEvaluation | None:
+    from app.config import get_settings
+    from app.ml.model import get_model
+
+    settings = get_settings()
+    model = get_model(str(settings.ml_model_path) if settings.ml_model_path else None) if settings.ml_enabled else None
+    if model is None or not findings:
+        return None
+    scores = score_findings_if_enabled(findings, dataset.transactions, lookback_minutes(cfg))
+    if any(s is None for s in scores):
+        return None
+    kept = [f for f, s in zip(findings, scores) if s.probability >= model.threshold]
+    meta = model.metadata
+    used = set(meta.get("train_seeds", [])) | set(meta.get("validation_seeds", []))
+    metrics = meta.get("metrics", {})
+    return TriageEvaluation(
+        model_version=model.version,
+        threshold=model.threshold,
+        result=score_detector("Graph engine + ML triage", [Detection(f.rule, frozenset(f.transaction_ids)) for f in kept], dataset),
+        alerts_removed=len(findings) - len(kept),
+        seed_overlaps_training=dataset.name == "benchmark" and dataset.seed in used,
+        recorded={k: metrics.get(k) for k in (
+            "episode_level_test_rules_only", "episode_level_test_with_triage", "leave_one_lookalike_out",
+            "ablation_with_amount_size_features")},
+        caveats=TRIAGE_CAVEATS,
+    )
+
+
 def run_evaluation(dataset: LabelledDataset, config: DetectionConfig | None = None) -> EvaluationReport:
     cfg = config or DetectionConfig()
     # Detectors receive ONLY the transactions. The episodes (answer key) are used afterwards, for scoring.
-    graph_dets = [Detection(f.rule, frozenset(f.transaction_ids)) for f in run_detection(dataset.transactions, cfg).findings]
+    findings = run_detection(dataset.transactions, cfg).findings
+    graph_dets = [Detection(f.rule, frozenset(f.transaction_ids)) for f in findings]
+    triage = _triage_evaluation(dataset, findings, cfg)
     start = time.perf_counter()
     hits = stream_detect(dataset.transactions, cfg)
     elapsed = time.perf_counter() - start
@@ -146,6 +198,7 @@ def run_evaluation(dataset: LabelledDataset, config: DetectionConfig | None = No
             background_transactions=dataset.background_count, episodes_by_role=roles, positives_by_kind=dict(sorted(kinds.items())),
         ),
         graph=score_detector("Graph engine (chain, cycle, burst, fan)", graph_dets, dataset),
+        triage=triage,
         baseline=score_detector("Baseline (large transfer, velocity, counterparties)", baseline_detect(dataset.transactions), dataset),
         delay=measure_delay(dataset, hits),
         sweeps=threshold_sweeps(dataset, cfg),
@@ -214,6 +267,13 @@ def format_report(r: EvaluationReport) -> str:
         f"(max {dl.max_minutes_from_first_transfer}); median {dl.median_minutes_after_last_transfer} min after the last transfer; "
         f"flagged before the pattern finished: {pct(dl.flagged_before_pattern_finished)}",
     ]
+    if r.triage is not None:
+        t = r.triage
+        lines += [
+            f"== Graph engine + ML triage ({t.model_version}, cut-off {t.threshold:.2f}): {t.alerts_removed} alerts removed",
+            f"  precision  {pct(t.result.precision)}   recall {pct(t.result.recall)}   F1 {t.result.f1}",
+            *(["  WARNING: this world was used to train or tune the model, so these numbers are optimistic."] if t.seed_overlaps_training else []),
+        ]
     for sw in r.sweeps:
         lines.append(f"Sweep {sw.parameter} (default {sw.default:g}):  " + "  ".join(
             f"{p.value:g}->P {p.precision if p.precision is not None else 'n/a'} R {p.recall if p.recall is not None else 'n/a'} ({p.findings} findings)" for p in sw.points))

@@ -11,6 +11,7 @@ from app.alerts.models import AlertSummary
 from app.db import connect
 from app.detection.engine import run_detection
 from app.detection.models import DetectionConfig
+from app.ml.service import score_findings_if_enabled
 from app.schemas import AccountCreate, Transaction, TransactionCreate
 from app.simulation.generator import SIM_PREFIX
 
@@ -40,7 +41,8 @@ def ingest_event(db_path: Path, tx: TransactionCreate, config: DetectionConfig |
 
         alerts: list[tuple[AlertSummary, str]] = []
         seen: set[int] = set()
-        for alert_id, outcome in alert_repo.save_findings_detailed(conn, findings):
+        triage = score_findings_if_enabled(findings, recent, lookback_minutes(cfg))
+        for alert_id, outcome in alert_repo.save_findings_detailed(conn, findings, triage):
             if outcome != "unchanged" and alert_id not in seen:
                 seen.add(alert_id)
                 alerts.append((alert_repo.get_alert_summary(conn, alert_id), outcome))

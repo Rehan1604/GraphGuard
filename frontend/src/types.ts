@@ -25,6 +25,15 @@ export interface AlertSummary {
   evidence_count: number
   created_at: string
   updated_at: string
+  ml_score?: number | null // triage estimate that this is a genuine pattern; null = not scored
+  ml_verdict?: 'likely_true' | 'likely_benign' | null
+}
+
+export interface MlDriver {
+  label: string
+  value: number
+  effect: number // change in the estimate caused by this feature
+  direction: 'raises' | 'lowers'
 }
 
 export interface ScoreContribution {
@@ -57,6 +66,8 @@ export interface AlertDetail extends AlertSummary {
   history: HistoryEvent[]
   allowed_next_statuses: Status[]
   comment_required_for: Status[]
+  ml_model?: string | null
+  ml_drivers?: MlDriver[]
 }
 
 export interface Stats {
@@ -164,7 +175,7 @@ export type ServerMessage =
 export interface Fact {
   id: string // F1, F2, ... computed from the stored transactions
   text: string
-  kind: 'summary' | 'evidence' | 'score'
+  kind: 'summary' | 'evidence' | 'score' | 'triage'
 }
 
 export interface Passage {
@@ -194,11 +205,29 @@ export interface Explanation {
   privacy_note: string | null
 }
 
+export interface CaseMatch {
+  id: string // C1, C2, ... a past reviewed alert in this workspace
+  alert_id: number
+  rule: string
+  status: string
+  summary: string
+  comment: string // shown here; never sent to an AI provider
+  score: number
+}
+
+export interface RetrievalInfo {
+  embedder: string
+  note: string
+  library_passages: number
+}
+
 export interface AssistantAnswer {
   alert_id: number
   question: string
   facts: Fact[]
   guidance: Passage[]
+  similar_cases?: CaseMatch[]
+  retrieval?: RetrievalInfo | null
   explanation: Explanation
   disclaimer: string
 }
@@ -267,7 +296,18 @@ export interface Sweep {
   points: SweepPoint[]
 }
 
+export interface TriageEvaluation {
+  model_version: string
+  threshold: number
+  result: DetectorResult
+  alerts_removed: number
+  seed_overlaps_training: boolean
+  recorded: Record<string, unknown>
+  caveats: string[]
+}
+
 export interface EvaluationReport {
+  triage?: TriageEvaluation | null
   dataset: {
     name: string
     seed: number

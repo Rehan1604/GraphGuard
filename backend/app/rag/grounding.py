@@ -2,7 +2,7 @@
 import re
 import string
 
-CITATION_RE = re.compile(r"\[((?:[FK]\d+)(?:\s*,\s*[FK]\d+)*)\]")
+CITATION_RE = re.compile(r"\[((?:[FKC]\d+)(?:\s*,\s*[FKC]\d+)*)\]")
 ALIAS_RE = re.compile(r"ACCT_[A-Z]+")
 
 

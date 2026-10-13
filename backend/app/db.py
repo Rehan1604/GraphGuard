@@ -43,7 +43,11 @@ CREATE TABLE IF NOT EXISTS alerts (
     status             TEXT NOT NULL DEFAULT 'new'
                        CHECK (status IN ('new', 'in_review', 'escalated', 'dismissed')),
     created_at         TEXT NOT NULL,
-    updated_at         TEXT NOT NULL
+    updated_at         TEXT NOT NULL,
+    ml_score           REAL,   -- triage model's estimate that this is a genuine pattern (NULL = not scored)
+    ml_verdict         TEXT,   -- 'likely_true' | 'likely_benign'
+    ml_model           TEXT,   -- which model version produced it
+    ml_drivers_json    TEXT    -- the features that moved the score most
 );
 
 -- Evidence links: which transactions support which alert (many-to-many)
@@ -87,10 +91,22 @@ def connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
+ALERT_ML_COLUMNS = (("ml_score", "REAL"), ("ml_verdict", "TEXT"), ("ml_model", "TEXT"), ("ml_drivers_json", "TEXT"))
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Bring a database made by an older version up to date. Safe to run every time."""
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(alerts)")}
+    for name, kind in ALERT_ML_COLUMNS:
+        if name not in have:
+            conn.execute(f"ALTER TABLE alerts ADD COLUMN {name} {kind}")
+
+
 def init_db(path: Path) -> None:
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        migrate(conn)
         conn.commit()
     finally:
         conn.close()

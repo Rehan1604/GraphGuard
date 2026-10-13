@@ -9,12 +9,12 @@ from app.db import get_db
 from app.ratelimit import rate_limited
 from app.rag.llm import LLMClient, build_client, describe_provider
 from app.rag.models import AskRequest, AssistantAnswer, AssistantStatus
-from app.rag.retrieval import TfidfIndex
-from app.rag.service import answer_question, get_index
+from app.rag.index import Retriever, get_retriever
+from app.rag.service import answer_question
 
 router = APIRouter(prefix="/api")
 Db = Annotated[sqlite3.Connection, Depends(get_db)]
-Index = Annotated[TfidfIndex, Depends(get_index)]
+Index = Annotated[Retriever, Depends(get_retriever)]
 
 
 def get_llm() -> LLMClient | None:
@@ -44,7 +44,7 @@ def ask(alert_id: int, payload: AskRequest, db: Db, index: Index, llm: Llm) -> A
     detail = alert_repo.get_alert_detail(db, alert_id)
     if detail is None:
         raise HTTPException(404, f"Alert {alert_id} not found")
-    return answer_question(detail, payload.question, index, llm, payload.use_ai)
+    return answer_question(detail, payload.question, index, db, llm, payload.use_ai)
 
 
 @router.get("/knowledge")
@@ -59,6 +59,7 @@ def knowledge_library(index: Index) -> list[dict]:
 
 @router.get("/knowledge/search")
 def knowledge_search(
+    db: Db,
     index: Index,
     q: Annotated[str, Query(min_length=1, max_length=300)],
     rule: str | None = None,
@@ -67,5 +68,5 @@ def knowledge_search(
     """Retrieval on its own, with scores, so you can see what the search step does before any generation."""
     return [
         {"id": c.id, "source": c.source, "section": c.section, "score": s, "text": c.text}
-        for c, s in index.search(q, rule=rule, top_k=top_k)
+        for c, s in index.search(db, q, rule=rule, top_k=top_k)
     ]

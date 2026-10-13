@@ -16,7 +16,7 @@ function describeEvent(e: HistoryEvent): string {
   return e.event
 }
 
-export default function AlertDetail({ alertId, refreshKey, onChanged }: {
+export default function AlertDetail({ alertId, refreshKey, onChanged, onAsk }: {
   alertId: number
   refreshKey: number
   onChanged: () => void
@@ -32,6 +32,7 @@ export default function AlertDetail({ alertId, refreshKey, onChanged }: {
           detail={detail}
           analyst={analyst}
           setAnalyst={setAnalyst}
+          onAsk={onAsk}
           onSaved={() => {
             state.reload()
             onChanged()
@@ -114,6 +115,8 @@ function Body({ detail, analyst, setAnalyst,onAsk ,onSaved}: {
           score built from the rules above. It is not a probability of fraud.
         </p>
       </Card>
+
+      <TriageCard detail={detail} />
 
       {/* ---------- WORKSPACE: opinions and decisions by people ---------- */}
       <Card title="Analyst workspace: opinions and decisions">
@@ -234,5 +237,40 @@ function NotesPanel({ detail, analyst, onSaved }: { detail: Detail; analyst: str
       </button>
       {error && <p role="alert" className="mt-2 text-sm text-amber-300">{error}</p>}
     </div>
+  )
+}
+
+function TriageCard({ detail }: { detail: Detail }) {
+  if (detail.ml_score === null || detail.ml_score === undefined) {
+    return (
+      <Card title="ML triage">
+        <p className="text-sm text-slate-400">
+          No triage estimate for this alert (the model is switched off or was not available when it was raised).
+          The rule score above is all there is.
+        </p>
+      </Card>
+    )
+  }
+  const pct = Math.round(detail.ml_score * 100)
+  return (
+    <Card title="ML triage: does this look like a genuine pattern?">
+      <p className="text-sm text-slate-300">
+        A trained classifier estimates <strong className="tabular-nums">{pct}%</strong> that this alert is a genuine
+        pattern rather than a benign look-alike (verdict:{' '}
+        <strong>{detail.ml_verdict === 'likely_benign' ? 'likely benign' : 'likely genuine'}</strong>). It is trained
+        on synthetic data and is an aid to review order, not a verdict about anyone.
+      </p>
+      <ul className="mt-3 space-y-1 text-sm">
+        {(detail.ml_drivers ?? []).map((d) => (
+          <li key={d.label} className="flex gap-3">
+            <span className={`w-14 shrink-0 text-right font-medium tabular-nums ${d.effect >= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {d.effect >= 0 ? '+' : ''}{Math.round(d.effect * 100)}
+            </span>
+            <span className="text-slate-300">{d.label} ({d.direction} the estimate)</span>
+          </li>
+        ))}
+      </ul>
+      {detail.ml_model && <p className="mt-2 text-xs text-slate-500">Model: {detail.ml_model}</p>}
+    </Card>
   )
 }

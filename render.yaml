@@ -15,6 +15,9 @@ services:
         value: "8000"
       - key: GRAPHGUARD_ENVIRONMENT
         value: production
+      # The free tier has little memory, so use the small offline embedder (no model download).
+      - key: GRAPHGUARD_RAG_EMBEDDER
+        value: lsa
       # Fill these in on the Render dashboard with your Vercel address (scheme + host, no path, no trailing slash),
       # as a JSON list, e.g. ["https://graphguard.vercel.app"]
       - key: GRAPHGUARD_CORS_ORIGINS

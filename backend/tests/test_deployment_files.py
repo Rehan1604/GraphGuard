@@ -2,6 +2,7 @@
 mistakes that can be caught by reading the files (and they run in CI)."""
 import ast
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -25,8 +26,11 @@ SKIP_DIRS = {"node_modules", ".venv", "__pycache__", ".pytest_cache", "dist", ".
 
 
 def text_files():
-    for path in ROOT.rglob("*"):
-        if path.is_file() and not (set(path.relative_to(ROOT).parts) & SKIP_DIRS):
+    # os.walk lets us skip big folders (node_modules, caches) without descending into them.
+    for folder, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for name in files:
+            path = Path(folder) / name
             if path.suffix in {".py", ".md", ".yml", ".yaml", ".json", ".ts", ".tsx", ".conf", ".txt", ".example", ".html", ""} \
                     and path.stat().st_size < 600_000 and path.name != "package-lock.json":
                 yield path
@@ -207,8 +211,9 @@ def test_every_third_party_import_is_declared():
                 imported.add(node.module.split(".")[0])
     third_party = imported - stdlib - local
     # starlette and pydantic come with fastapi; uvicorn is the server
-    provided = {"starlette": "fastapi", "pydantic": "fastapi", "pydantic_settings": "pydantic_settings"}
-    for mod in third_party:
+    provided = {"starlette": "fastapi", "pydantic": "fastapi", "pydantic_settings": "pydantic_settings", "sklearn": "scikit_learn"}
+    optional = {"fastembed"}  # imported lazily; listed in requirements-neural.txt
+    for mod in third_party - optional:
         assert mod.lower() in declared or provided.get(mod) in declared, f"{mod} is imported but not in requirements.txt"
 
 

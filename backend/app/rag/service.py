@@ -1,16 +1,15 @@
 """Puts the pieces together: facts (database) + guidance (retrieval) + explanation (AI or rules)."""
 import re
-from functools import lru_cache
+import sqlite3
 
 from app.alerts.models import AlertDetail
-from app.rag.chunking import load_chunks
 from app.rag.facts import build_facts
 from app.rag.fallback import rule_based_sections
 from app.rag.grounding import Pseudonymizer, find_accusatory_language, parse_sections, validate_citations
 from app.rag.llm import LLMClient, LLMError
-from app.rag.models import AssistantAnswer, Explanation, Fact, Passage, Section
+from app.rag.index import Retriever
+from app.rag.models import AssistantAnswer, CaseMatch, Explanation, Fact, Passage, RetrievalInfo, Section
 from app.rag.prompts import SYSTEM_PROMPT, build_user_prompt
-from app.rag.retrieval import TfidfIndex
 
 DISCLAIMER = (
     "This is a pattern flagged for human review, not proof of wrongdoing. Facts come from the stored transactions; "
@@ -29,17 +28,12 @@ class GroundingError(Exception):
     pass
 
 
-@lru_cache
-def get_index() -> TfidfIndex:
-    return TfidfIndex(load_chunks())
-
-
-def retrieve_for_alert(index: TfidfIndex, rule: str, question: str, top_k: int = 4) -> list[Passage]:
-    """Passages that match the question, plus the standard guidance for this pattern (labelled as such)."""
+def retrieve_for_alert(retriever: Retriever, conn: sqlite3.Connection, rule: str, question: str, top_k: int = 4) -> list[Passage]:
+    """Passages closest in meaning to the question, plus the standard guidance for this pattern (labelled as such)."""
     query = f"{question} {RULE_QUERY.get(rule, '')}"
-    chosen: list[tuple] = [(c, s, "similarity") for c, s in index.search(query, rule=rule, top_k=top_k)]
+    chosen: list[tuple] = [(c, s, "similarity") for c, s in retriever.search(conn, query, rule=rule, top_k=top_k)]
     have = {c.id for c, _, _ in chosen}
-    chosen += [(c, 0.0, "rule_default") for c in index.core_chunks(rule) if c.id not in have]
+    chosen += [(c, 0.0, "rule_default") for c in retriever.core_chunks(rule) if c.id not in have]
     return [
         Passage(id=f"K{i}", source=c.source, title=c.title, section=c.section, text=c.text, score=s, via=via)
         for i, (c, s, via) in enumerate(chosen, start=1)
@@ -54,17 +48,26 @@ def _privacy_note(n_facts: int, n_passages: int) -> str:
     )
 
 
+def retrieve_cases(retriever: Retriever, conn: sqlite3.Connection, detail: AlertDetail, question: str, top_k: int = 3) -> list[CaseMatch]:
+    """Reviewed past alerts of the same pattern whose reviewer comments are closest in meaning to the question."""
+    reasons = " ".join(c.reason for c in detail.contributions)
+    query = f"{question} {RULE_QUERY.get(detail.rule, '')} {reasons}"
+    hits = retriever.similar_cases(conn, detail.id, detail.rule, query, top_k)
+    return [CaseMatch(id=f"C{i}", alert_id=h.alert_id, rule=h.rule, status=h.status, summary=h.summary, comment=h.comment, score=h.score)
+            for i, h in enumerate(hits, start=1)]
+
+
 def _ai_explanation(
-    detail: AlertDetail, question: str, facts: list[Fact], passages: list[Passage], client: LLMClient
+    detail: AlertDetail, question: str, facts: list[Fact], passages: list[Passage], cases: list[CaseMatch], client: LLMClient
 ) -> Explanation:
     accounts = list(detail.accounts) + [a for t in detail.evidence for a in (t.source_account_id, t.target_account_id)]
     aliases = Pseudonymizer(accounts)
     safe_facts = build_facts(detail, name=aliases.alias)  # same ids and order as the displayed facts
-    prompt = build_user_prompt(aliases.alias_text(question), safe_facts, passages)
+    prompt = build_user_prompt(aliases.alias_text(question), safe_facts, passages, cases)
 
     raw = client.complete(SYSTEM_PROMPT, prompt)
     text = aliases.restore(raw)
-    valid_ids = {f.id for f in facts} | {p.id for p in passages}
+    valid_ids = {f.id for f in facts} | {p.id for p in passages} | {c.id for c in cases}
     text, cited, removed = validate_citations(text, valid_ids)
     if not cited:
         raise GroundingError("the AI answer cited none of the supplied sources, so it was discarded")
@@ -90,23 +93,24 @@ def _ai_explanation(
 
 
 def answer_question(
-    detail: AlertDetail, question: str, index: TfidfIndex, client: LLMClient | None, use_ai: bool
+    detail: AlertDetail, question: str, retriever: Retriever, conn: sqlite3.Connection, client: LLMClient | None, use_ai: bool
 ) -> AssistantAnswer:
     facts = build_facts(detail)
-    passages = retrieve_for_alert(index, detail.rule, question)
+    passages = retrieve_for_alert(retriever, conn, detail.rule, question)
+    cases = retrieve_cases(retriever, conn, detail, question)
 
     explanation: Explanation | None = None
     warnings: list[str] = []
     if use_ai and client is not None:
         try:
-            explanation = _ai_explanation(detail, question, facts, passages, client)
+            explanation = _ai_explanation(detail, question, facts, passages, cases, client)
         except LLMError as exc:
             warnings.append(f"The AI provider could not be used ({exc}). Showing the rule-based summary instead.")
         except GroundingError as exc:
             warnings.append(f"Showing the rule-based summary instead: {exc}.")
 
     if explanation is None:
-        sections = rule_based_sections(detail, facts, passages)
+        sections = rule_based_sections(detail, facts, passages, cases)
         cited = sorted({m for s in sections for i in s.items for m in _cites(i)})
         why = "AI turned off for this request" if not use_ai else "no AI provider is configured" if client is None else "the AI answer was not used"
         explanation = Explanation(
@@ -118,9 +122,11 @@ def answer_question(
             warnings=warnings,
         )
     return AssistantAnswer(
-        alert_id=detail.id, question=question, facts=facts, guidance=passages, explanation=explanation, disclaimer=DISCLAIMER
+        alert_id=detail.id, question=question, facts=facts, guidance=passages, similar_cases=cases, explanation=explanation,
+        retrieval=RetrievalInfo(embedder=retriever.embedder.name, note=retriever.note, library_passages=len(retriever.chunks)),
+        disclaimer=DISCLAIMER,
     )
 
 
 def _cites(item: str) -> list[str]:
-    return re.findall(r"\[([FK]\d+)\]", item)
+    return re.findall(r"\[([FKC]\d+)\]", item)
